@@ -22,7 +22,7 @@ def receive_messages(sock):
             _, ip, port, status = message.split()
             peer = (ip, int(port))
             keep_track[peer] = status
-            print(f"Status update from {peer}: {status}   pllllll")
+            #print(f"Status update from {peer}: {status}   pllllll")
         if addr not in peers:
             peers.append(addr)
             keep_track[addr] = '1'
@@ -35,10 +35,11 @@ def send_message(sock, message):
 
 def send_status(sock):
     for peer in peers:
-        if(peer != own_address):
-            message = f"status {peer[0]} {peer[1]} {keep_track[peer]}"
-            print(f"Sending status update to {peer}: {keep_track[peer]}")
-            sock.sendto(message.encode('utf-8'), peer)
+        for p in keep_track:
+            if(peer != own_address and p != peer):
+                message = f"status {peer[0]} {peer[1]} {keep_track[peer]}"
+                #print(f"Sending status update to {peer}: {keep_track[peer]}")
+                sock.sendto(message.encode('utf-8'), p)
 
 def announce_presence(sock, own_port):
     message = f"hello from {own_port}"
@@ -79,6 +80,7 @@ def handle_user_input(sock):
 def main():
     host = get_host_ip()
     port = int(input("Enter port number: "))
+
     global peers, last_seen, keep_track, own_address
     own_address = (host, port)
     keep_track = {(host, port): '1'}
