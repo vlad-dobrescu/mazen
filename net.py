@@ -2,69 +2,69 @@ import socket
 import threading
 import time
 
-# Predefined list of potential peer ports
-potential_peers = [5001, 5002, 5003]
-
-
 def get_host_ip():
     """Automatically determine the local IP address."""
     try:
-        # This creates a temporary connection to an Internet IP to find the interface used for the Internet connection
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))  # Google DNS server IP and port
+        s.connect(("8.8.8.8", 80))
         IP = s.getsockname()[0]
         s.close()
     except Exception:
-        IP = '127.0.0.1'  # Fallback to localhost if the network is unreachable
+        IP = '127.0.0.1'
     return IP
-# Function to handle incoming messages
+
 def receive_messages(sock):
     while True:
-        data, addr = sock.recvfrom(1024)  # Buffer size is 1024 bytes
+        data, addr = sock.recvfrom(1024)
         message = data.decode('utf-8')
-        print(f"Received message from {addr}: {message}")
+        #print(f"Received message from {addr}: {message}")
+        if message.startswith("status"):
+            _, ip, port, status = message.split()
+            peer = (ip, int(port))
+            keep_track[peer] = status
+            print(f"Status update from {peer}: {status}   pllllll")
         if addr not in peers:
             peers.append(addr)
+            keep_track[addr] = '1'
             print(f"New peer added: {addr}")
-        last_seen[addr] = time.time()  # Update the last seen time for the peer
+        last_seen[addr] = time.time()
 
-# Function to send a message to all peers
 def send_message(sock, message):
     for peer in peers:
         sock.sendto(message.encode('utf-8'), peer)
 
-# Function to announce the presence of this peer to potential peers
+def send_status(sock):
+    for peer in peers:
+        if(peer != own_address):
+            message = f"status {peer[0]} {peer[1]} {keep_track[peer]}"
+            print(f"Sending status update to {peer}: {keep_track[peer]}")
+            sock.sendto(message.encode('utf-8'), peer)
+
 def announce_presence(sock, own_port):
     message = f"hello from {own_port}"
-    broadcast_address = '192.168.0.101'  # Adjust to your local network's broadcast address
-    for port in potential_peers:
-        if port != own_port:
-            sock.sendto(message.encode('utf-8'), (broadcast_address, port))
+    broadcast_address = '192.168.0.101'  # Ensure this is the correct broadcast address for your network
+    sock.sendto(message.encode('utf-8'), (broadcast_address, 6969))
 
-
-# Heartbeat function to periodically check peer availability
 def heartbeat(sock, own_port):
     while True:
-        time.sleep(5)  # Send a heartbeat every 5 seconds
+        time.sleep(5)
         send_message(sock, f"heartbeat from {own_port}")
-        check_peers()  # Check for any peers that should be timed out
+        check_peers()
 
-# Check for peers that have timed out
 def check_peers():
     current_time = time.time()
-    timeout = 15  # Time in seconds after which we consider a peer dead if no heartbeat received
+    timeout = 15
     for peer in list(peers):
         if current_time - last_seen.get(peer, 0) > timeout:
-            if peer in peers:
-                peers.remove(peer)
+            peers.remove(peer)
+            keep_track[peer] = '0'
             if peer in last_seen:
                 del last_seen[peer]
             print(f"Peer {peer} has timed out and been removed.")
 
-# Function to handle user input
 def handle_user_input(sock):
     while True:
-        command = input("Enter command (send <message>, list): ")
+        command = input("Enter command (send <message>, list, check): ")
         if command.startswith("send "):
             message = command[5:]
             send_message(sock, message)
@@ -72,29 +72,32 @@ def handle_user_input(sock):
             print("Connected peers:")
             for peer in peers:
                 print(f"Peer: {peer}")
+        elif command.startswith("check"):
+            for p, status in keep_track.items():
+                print(f"Peer: {p}, Status: {status}")
 
-# Main function to set up the peer
 def main():
     host = get_host_ip()
-    port = int(input("Enter port number for this peer: "))
+    port = int(input("Enter port number: "))
+    global peers, last_seen, keep_track, own_address
     own_address = (host, port)
-    global peers, last_seen
-    peers = [own_address]  # Start with own address
-    last_seen = {own_address: time.time()}  # Initialize last seen for self
+    keep_track = {(host, port): '1'}
+    peers = [(host, port)]
+    last_seen = {(host, port): time.time()}
 
-    # Creating a socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    sock.bind(own_address)
+    sock.bind((host, port))
 
-    # Announce presence to other potential peers
     announce_presence(sock, port)
 
-    # Starting threads for handling incoming messages, user input, and heartbeats
     threading.Thread(target=receive_messages, args=(sock,)).start()
     threading.Thread(target=handle_user_input, args=(sock,)).start()
     threading.Thread(target=heartbeat, args=(sock, port)).start()
 
+    while True:
+        time.sleep(5)
+        send_status(sock)
 
 if __name__ == "__main__":
     main()
