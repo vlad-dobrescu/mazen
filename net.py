@@ -58,17 +58,24 @@ def heartbeat(sock, own_port):
 
 def check_peers():
     current_time = time.time()
-    timeout = 15
-    for peer in list(peers):
-        if current_time - last_seen.get(peer, 0) > timeout:
-            peers.remove(peer)
-            if(keep_track[peer] == '2'):    #if the peer is host
-                keep_track[own_address] = '2'   #set self to host
+    timeout = 7
+    peers_to_remove = []
 
+    for peer in peers:
+        if current_time - last_seen.get(peer, 0) > timeout:
+            peers_to_remove.append(peer)
             keep_track[peer] = '0'
             if peer in last_seen:
                 del last_seen[peer]
             print(f"Peer {peer} has timed out and been removed.")
+
+    # Remove peers outside the loop to prevent modification during iteration issues
+    for peer in peers_to_remove:
+        peers.remove(peer)
+
+    # Update host after cleaning up timed-out peers
+    update_host_peer()
+
 
 def handle_user_input(sock):
     while True:
@@ -84,16 +91,30 @@ def handle_user_input(sock):
             for p, status in keep_track.items():
                 print(f"Peer: {p}, Status: {status}")
 
-def update_host_peer(sock, keep_track):
-    #if the only thing in keep_track is self
-    if len(keep_track) == 1:
-        keep_track[own_address] = '2' #set self to host
-        print(f"Updated self to host")
+def update_host_peer():
+    global keep_track, peers
+    # Determine if a host already exists
+    current_host = [peer for peer, status in keep_track.items() if status == '2']
+    if current_host:
+        return  # If there's already a host, no need to update
+
+    if not peers:
+        print("No peers left to assign host.")
+        return
+
+    # Find the smallest address from the list of peers
+    smallest_peer = min(peers, key=lambda x: (x[0], x[1]))
+    keep_track[smallest_peer] = '2'
+    print(f"Updated host to {smallest_peer}")
+
        
 
 def main():
     host = get_host_ip()
-    port = int(input("Enter port number: "))
+    port = int(input("Enter your port number: "))
+
+    #broadcast_address = input("Enter the adress you want to connect to (Type 0 if none): ")
+    #broadcast_port = input("Enter the port you want to connect to (Type 0 if none): ")
 
     global peers, last_seen, keep_track, own_address
     own_address = (host, port)
@@ -113,7 +134,7 @@ def main():
 
     while True:
         time.sleep(5)
-        update_host_peer(sock, keep_track)
+        update_host_peer()
         send_status(sock)
 
 if __name__ == "__main__":
