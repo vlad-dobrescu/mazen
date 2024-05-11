@@ -40,6 +40,10 @@ def send_status(sock):
                 message = f"status {peer[0]} {peer[1]} {keep_track[peer]}"
                 #print(f"Sending status update to {peer}: {keep_track[peer]}")
                 sock.sendto(message.encode('utf-8'), p)
+            elif(keep_track[peer] == '2'):
+                message = f"status {peer[0]} {peer[1]} {keep_track[peer]}"
+                #print(f"Sending status update to {peer}: {keep_track[peer]}")
+                sock.sendto(message.encode('utf-8'), p)
 
 def announce_presence(sock, own_port):
     message = f"hello from {own_port}"
@@ -58,6 +62,9 @@ def check_peers():
     for peer in list(peers):
         if current_time - last_seen.get(peer, 0) > timeout:
             peers.remove(peer)
+            if(keep_track[peer] == '2'):    #if the peer is host
+                keep_track[own_address] = '2'   #set self to host
+
             keep_track[peer] = '0'
             if peer in last_seen:
                 del last_seen[peer]
@@ -76,6 +83,13 @@ def handle_user_input(sock):
         elif command.startswith("check"):
             for p, status in keep_track.items():
                 print(f"Peer: {p}, Status: {status}")
+
+def update_host_peer(sock, keep_track):
+    #if the only thing in keep_track is self
+    if len(keep_track) == 1:
+        keep_track[own_address] = '2' #set self to host
+        print(f"Updated self to host")
+       
 
 def main():
     host = get_host_ip()
@@ -99,6 +113,7 @@ def main():
 
     while True:
         time.sleep(5)
+        update_host_peer(sock, keep_track)
         send_status(sock)
 
 if __name__ == "__main__":
