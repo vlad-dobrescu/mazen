@@ -462,7 +462,7 @@ def update():
         time.sleep(5)
         update_host_peer()
         send_status(sock)
-
+time.sleep(1)
 
 def main():
     host = get_host_ip()
