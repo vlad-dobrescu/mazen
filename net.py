@@ -455,12 +455,14 @@ def main():
 
     announce_presence(sock, port)
     
-
+    
 
     threading.Thread(target=receive_messages, args=(sock,)).start()
     threading.Thread(target=update, args=()).start()
     threading.Thread(target=handle_user_input, args=(sock,)).start()
     threading.Thread(target=heartbeat, args=(sock, port)).start()
+
+    time.sleep(1)
 
     if(keep_track[own_address] == '2'):
         maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
