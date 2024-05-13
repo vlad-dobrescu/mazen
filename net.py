@@ -7,19 +7,31 @@ import timeit
 import os
 
 
-OBJ_SIZE = 64
-OBJ_SCALE = 0.5
+NATIVE_SPRITE_SIZE = 128
+SPRITE_SCALING = 0.25
+SPRITE_SIZE = int(NATIVE_SPRITE_SIZE * SPRITE_SCALING)
 
-SCREEN_WIDTH = 1280
-SCREEN_HEIGHT = 720
-SCREEN_TITLE = "Maze Game"
+SCREEN_WIDTH = 1000
+SCREEN_HEIGHT = 700
+SCREEN_TITLE = "Maze Depth First Example"
 
 MOVEMENT_SPEED = 8
-CELL_EMPTY = 0
-CELL_FULL  = 1
-MAZE_HEIGHT = 21
-MAZE_WIDTH = 21
+
+TILE_EMPTY = 0
+TILE_CRATE = 1
+
+# Maze must have an ODD number of rows and columns.
+# Walls go on EVEN rows/columns.
+# Openings go on ODD rows/columns
+MAZE_HEIGHT = 9
+MAZE_WIDTH = 9
+
+MERGE_SPRITES = True
+
+# How many pixels to keep as a minimum margin between the character
+# and the edge of the screen.
 VIEWPORT_MARGIN = 200
+
 
 def create_grid(width, height):
     """ Create a grid with empty cells on odd row/column combinations. """
@@ -28,12 +40,13 @@ def create_grid(width, height):
         grid.append([])
         for column in range(width):
             if column % 2 == 1 and row % 2 == 1:
-                grid[row].append(CELL_FULL)
+                grid[row].append(TILE_EMPTY)
             elif column == 0 or row == 0 or column == width - 1 or row == height - 1:
-                grid[row].append(CELL_FULL)
+                grid[row].append(TILE_CRATE)
             else:
-                grid[row].append(CELL_FULL)
+                grid[row].append(TILE_CRATE)
     return grid
+
 
 def create_maze(maze_width, maze_height):
     # Initialize the maze grid
@@ -74,7 +87,7 @@ def create_maze(maze_width, maze_height):
                 # Calculate the column index for the path
                 path_col = x * 2 + 1
                 # Set the path cell to empty
-                maze[path_row][path_col] = CELL_EMPTY
+                maze[path_row][path_col] = TILE_EMPTY
             # Check if the movement is horizontal
             elif next_y == y:
                 # Calculate the row index for the path
@@ -82,7 +95,7 @@ def create_maze(maze_width, maze_height):
                 # Calculate the column index for the path
                 path_col = max(x, next_x) * 2
                 # Set the path cell to empty
-                maze[path_row][path_col] = CELL_EMPTY
+                maze[path_row][path_col] = TILE_EMPTY
 
             
             # Recursively visit the next cell
@@ -92,6 +105,209 @@ def create_maze(maze_width, maze_height):
     walk(random.randrange(cells_wide), random.randrange(cells_high))
 
     return maze
+
+
+class MyGame(arcade.Window):
+    """ Main application class. """
+    def __init__(self, width, height, title, maze):
+        """
+        Initializer
+        """
+        super().__init__(width, height, title)
+
+        # Set the working directory (where we expect to find files) to the same
+        # directory this .py file is in. You can leave this out of your own
+        # code, but it is needed to easily run the examples using "python -m"
+        # as mentioned at the top of this program.
+        file_path = os.path.dirname(os.path.abspath(__file__))
+        os.chdir(file_path)
+
+        # Sprite lists
+        self.player_list = None
+        self.wall_list = None
+
+        # Player info
+        self.score = 0
+        self.player_sprite = None
+
+        # Physics engine
+        self.physics_engine = None
+
+        # Used to scroll
+        self.view_bottom = 0
+        self.view_left = 0
+
+        # Time to process
+        self.processing_time = 0
+        self.draw_time = 0
+
+    def setup(self):
+        """ Set up the game and initialize the variables. """
+        print(maze)
+        # Sprite lists
+        self.player_list = arcade.SpriteList()
+        self.wall_list = arcade.SpriteList()
+
+        self.score = 0
+
+ 
+        for row in range(MAZE_HEIGHT):
+            for column in range(MAZE_WIDTH):
+                if maze[row][column] == 1:
+                    wall = arcade.Sprite(":resources:images/tiles/grassCenter.png", SPRITE_SCALING)
+                    wall.center_x = column * SPRITE_SIZE + SPRITE_SIZE / 2
+                    wall.center_y = row * SPRITE_SIZE + SPRITE_SIZE / 2
+                    self.wall_list.append(wall)
+
+        # Set up the player
+        self.player_sprite = arcade.Sprite(":resources:images/animated_characters/female_person/"
+                                           "femalePerson_idle.png",
+                                           SPRITE_SCALING)
+        self.player_list.append(self.player_sprite)
+
+        # Randomly place the player. If we are in a wall, repeat until we aren't.
+        placed = False
+        while not placed:
+
+            # Randomly position
+          for row in range(MAZE_HEIGHT):
+              for column in range(MAZE_WIDTH):
+                if maze[row][column] == 0:
+                    self.player_sprite.center_x = column * SPRITE_SIZE + SPRITE_SIZE / 2
+                    self.player_sprite.center_y = row * SPRITE_SIZE + SPRITE_SIZE / 2
+                    placed = True
+                    break
+            # Are we in a wall?
+            # walls_hit = arcade.check_for_collision_with_list(self.player_sprite, self.wall_list)
+            # if len(walls_hit) == 0:
+            #     # Not in a wall! Success!
+            #     placed = True
+
+  
+        self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list)
+
+        # Set the background color
+        arcade.set_background_color(arcade.color.AMAZON)
+
+        # Set the viewport boundaries
+        # These numbers set where we have 'scrolled' to.
+        self.view_left = 0
+        self.view_bottom = 0
+        print(f"Total wall blocks: {len(self.wall_list)}")
+
+    def on_draw(self):
+        """
+        Render the screen.
+        """
+
+        # This command has to happen before we start drawing
+        self.clear()
+
+        # Start timing how long this takes
+        draw_start_time = timeit.default_timer()
+
+        # Draw all the sprites.
+        self.wall_list.draw()
+        self.player_list.draw()
+
+        # Draw info on the screen
+        sprite_count = len(self.wall_list)
+
+        output = f"Sprite Count: {sprite_count}"
+        arcade.draw_text(output,
+                         self.view_left + 20,
+                         SCREEN_HEIGHT - 20 + self.view_bottom,
+                         arcade.color.WHITE, 16)
+
+        output = f"Drawing time: {self.draw_time:.3f}"
+        arcade.draw_text(output,
+                         self.view_left + 20,
+                         SCREEN_HEIGHT - 40 + self.view_bottom,
+                         arcade.color.WHITE, 16)
+
+        output = f"Processing time: {self.processing_time:.3f}"
+        arcade.draw_text(output,
+                         self.view_left + 20,
+                         SCREEN_HEIGHT - 60 + self.view_bottom,
+                         arcade.color.WHITE, 16)
+
+        self.draw_time = timeit.default_timer() - draw_start_time
+
+    def on_key_press(self, key, modifiers):
+        """Called whenever a key is pressed. """
+
+        if key == arcade.key.UP:
+            self.player_sprite.change_y = MOVEMENT_SPEED
+        elif key == arcade.key.DOWN:
+            self.player_sprite.change_y = -MOVEMENT_SPEED
+        elif key == arcade.key.LEFT:
+            self.player_sprite.change_x = -MOVEMENT_SPEED
+        elif key == arcade.key.RIGHT:
+            self.player_sprite.change_x = MOVEMENT_SPEED
+
+    def on_key_release(self, key, modifiers):
+        """Called when the user releases a key. """
+
+        if key == arcade.key.UP or key == arcade.key.DOWN:
+            self.player_sprite.change_y = 0
+        elif key == arcade.key.LEFT or key == arcade.key.RIGHT:
+            self.player_sprite.change_x = 0
+
+    def on_update(self, delta_time):
+        """ Movement and game logic """
+
+        start_time = timeit.default_timer()
+
+        # Call update on all sprites (The sprites don't do much in this
+        # example though.)
+        self.physics_engine.update()
+
+        # --- Manage Scrolling ---
+
+        # Track if we need to change the viewport
+
+        changed = False
+
+        # Scroll left
+        left_bndry = self.view_left + VIEWPORT_MARGIN
+        if self.player_sprite.left < left_bndry:
+            self.view_left -= left_bndry - self.player_sprite.left
+            changed = True
+
+        # Scroll right
+        right_bndry = self.view_left + SCREEN_WIDTH - VIEWPORT_MARGIN
+        if self.player_sprite.right > right_bndry:
+            self.view_left += self.player_sprite.right - right_bndry
+            changed = True
+
+        # Scroll up
+        top_bndry = self.view_bottom + SCREEN_HEIGHT - VIEWPORT_MARGIN
+        if self.player_sprite.top > top_bndry:
+            self.view_bottom += self.player_sprite.top - top_bndry
+            changed = True
+
+        # Scroll down
+        bottom_bndry = self.view_bottom + VIEWPORT_MARGIN
+        if self.player_sprite.bottom < bottom_bndry:
+            self.view_bottom -= bottom_bndry - self.player_sprite.bottom
+            changed = True
+
+        if changed:
+            arcade.set_viewport(self.view_left,
+                                SCREEN_WIDTH + self.view_left,
+                                self.view_bottom,
+                                SCREEN_HEIGHT + self.view_bottom)
+
+        # Save the time it took to do this.
+        self.processing_time = timeit.default_timer() - start_time
+
+def send_maze(sock):
+    for peer in keep_track:
+        if(keep_track[own_address] == '2' and peer != own_address):
+            #print(f"Creating maze: {maze}")
+            message = f"maze {maze}"
+            sock.sendto(message.encode('utf-8'), peer)
+            print(f"Sending {maze} to {peer}")
 
 
 def get_host_ip():
@@ -106,14 +322,15 @@ def get_host_ip():
     return IP
 
 def receive_messages(sock):
+    global recv_maze
     while True:
         data, addr = sock.recvfrom(2048)
         message = data.decode('utf-8')
         #print(f"Received message from {addr}: {message}")
         if message.startswith("maze"):
             #strip message to "maze " and the rest 
-            maze = message[5:]
-            print(f"Received maze from {addr}: {maze}")
+            recv_maze = message[5:]
+            print(f"Received maze from {addr}: {recv_maze}")
         if message.startswith("status"):
             _, ip, port, status = message.split()
             peer = (ip, int(port))
@@ -123,6 +340,11 @@ def receive_messages(sock):
             peers.append(addr)
             keep_track[addr] = '1'
             print(f"New peer added: {addr}")
+            send_maze(sock)
+        if(len(peers) == 1):
+            keep_track[addr] = '2'
+            print(f"Updated host to {addr}")
+
         last_seen[addr] = time.time()
 
 def send_message(sock, message):
@@ -190,7 +412,11 @@ def handle_user_input(sock):
 def update_host_peer():
     global keep_track, peers
     # Determine if a host already exists
-    current_host = [peer for peer, status in keep_track.items() if status == '2']
+    current_host = []
+    for peer, status in keep_track.items():
+        if status == '2':
+            current_host.append(peer)
+
     if current_host:
         return  # If there's already a host, no need to update
 
@@ -203,7 +429,12 @@ def update_host_peer():
     keep_track[smallest_peer] = '2'
     print(f"Updated host to {smallest_peer}")
 
-       
+def update():
+    while True:
+        time.sleep(5)
+        update_host_peer()
+        send_status(sock)
+
 
 def main():
     host = get_host_ip()
@@ -212,7 +443,7 @@ def main():
     #broadcast_address = input("Enter the adress you want to connect to (Type 0 if none): ")
     #broadcast_port = input("Enter the port you want to connect to (Type 0 if none): ")
 
-    global peers, last_seen, keep_track, own_address, sock
+    global peers, last_seen, keep_track, own_address, sock, maze, recv_maze
     own_address = (host, port)
     keep_track = {(host, port): '1'}
     peers = [(host, port)]
@@ -223,25 +454,23 @@ def main():
     sock.bind((host, port))
 
     announce_presence(sock, port)
+    
+
 
     threading.Thread(target=receive_messages, args=(sock,)).start()
+    threading.Thread(target=update, args=()).start()
     threading.Thread(target=handle_user_input, args=(sock,)).start()
     threading.Thread(target=heartbeat, args=(sock, port)).start()
 
+    if(keep_track[own_address] == '2'):
+        maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
+    else:
+        #convert string to list
+        maze = eval(recv_maze)
 
-    while True:
-        time.sleep(5)
-        update_host_peer()
-        send_status(sock)
-        for peer in peers:
-            for p in keep_track:
-                if(keep_track[p] == '2'):
-                    maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
-                    #print(f"Creating maze: {maze}")
-                    if(peer != p and peer != own_address):
-                        message = f"maze {maze}"
-                        sock.sendto(message.encode('utf-8'), peer)
-                        print(f"Sending {maze} to {peer}")
+    window = MyGame(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, maze)
+    window.setup()
+    arcade.run()
 
 
 if __name__ == "__main__":
