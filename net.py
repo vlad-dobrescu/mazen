@@ -1,6 +1,98 @@
 import socket
 import threading
 import time
+import arcade
+import random
+import timeit
+import os
+
+
+OBJ_SIZE = 64
+OBJ_SCALE = 0.5
+
+SCREEN_WIDTH = 1280
+SCREEN_HEIGHT = 720
+SCREEN_TITLE = "Maze Game"
+
+MOVEMENT_SPEED = 8
+CELL_EMPTY = 0
+CELL_FULL  = 1
+MAZE_HEIGHT = 21
+MAZE_WIDTH = 21
+VIEWPORT_MARGIN = 200
+
+def create_grid(width, height):
+    """ Create a grid with empty cells on odd row/column combinations. """
+    grid = []
+    for row in range(height):
+        grid.append([])
+        for column in range(width):
+            if column % 2 == 1 and row % 2 == 1:
+                grid[row].append(CELL_FULL)
+            elif column == 0 or row == 0 or column == width - 1 or row == height - 1:
+                grid[row].append(CELL_FULL)
+            else:
+                grid[row].append(CELL_FULL)
+    return grid
+
+def create_maze(maze_width, maze_height):
+    # Initialize the maze grid
+    maze = create_grid(maze_width, maze_height)
+
+    # Compute number of cells along width and height in the maze
+    cells_wide = (maze_width - 1) // 2
+    cells_high = (maze_height - 1) // 2
+
+    # Create a grid to keep track of visited cells, with a border marked as visited
+    # Create a 2D list to track visited cells
+    visited = []
+    for _ in range(cells_high):
+        # Each row has 'cells_wide' number of False (not visited), and an extra True at the end (border)
+        row = [False] * cells_wide + [True]
+        visited.append(row)
+    # Add an additional row at the bottom of the grid to mark it as visited (acts as a border)
+    visited.append([True] * (cells_wide + 1))
+
+    def walk(x, y):
+
+        # Mark the current cell as visited
+        visited[y][x] = True
+
+        # Directions: left, down, right, up
+        directions = [(x - 1, y), (x, y + 1), (x + 1, y), (x, y - 1)]
+        random.shuffle(directions)  # Randomize directions to ensure maze variability
+
+        for (next_x, next_y) in directions:
+            if visited[next_y][next_x]:
+                continue  # Skip already visited cells
+            
+            # Open a path between the current cell and the chosen adjacent cell
+            # Check if the movement is vertical
+            if next_x == x:
+                # Calculate the row index for the path
+                path_row = max(y, next_y) * 2
+                # Calculate the column index for the path
+                path_col = x * 2 + 1
+                # Set the path cell to empty
+                maze[path_row][path_col] = CELL_EMPTY
+            # Check if the movement is horizontal
+            elif next_y == y:
+                # Calculate the row index for the path
+                path_row = y * 2 + 1
+                # Calculate the column index for the path
+                path_col = max(x, next_x) * 2
+                # Set the path cell to empty
+                maze[path_row][path_col] = CELL_EMPTY
+
+            
+            # Recursively visit the next cell
+            walk(next_x, next_y)
+
+    # Start the maze generation from a random cell within the grid
+    walk(random.randrange(cells_wide), random.randrange(cells_high))
+
+    return maze
+
 
 def get_host_ip():
     """Automatically determine the local IP address."""
@@ -15,9 +107,13 @@ def get_host_ip():
 
 def receive_messages(sock):
     while True:
-        data, addr = sock.recvfrom(1024)
+        data, addr = sock.recvfrom(2048)
         message = data.decode('utf-8')
         #print(f"Received message from {addr}: {message}")
+        if message.startswith("maze"):
+            #strip message to "maze " and the rest 
+            maze = message[5:]
+            print(f"Received maze from {addr}: {maze}")
         if message.startswith("status"):
             _, ip, port, status = message.split()
             peer = (ip, int(port))
@@ -116,7 +212,7 @@ def main():
     #broadcast_address = input("Enter the adress you want to connect to (Type 0 if none): ")
     #broadcast_port = input("Enter the port you want to connect to (Type 0 if none): ")
 
-    global peers, last_seen, keep_track, own_address
+    global peers, last_seen, keep_track, own_address, sock
     own_address = (host, port)
     keep_track = {(host, port): '1'}
     peers = [(host, port)]
@@ -132,10 +228,27 @@ def main():
     threading.Thread(target=handle_user_input, args=(sock,)).start()
     threading.Thread(target=heartbeat, args=(sock, port)).start()
 
+
     while True:
         time.sleep(5)
         update_host_peer()
         send_status(sock)
+        for peer in peers:
+            for p in keep_track:
+                if(keep_track[p] == '2'):
+                    maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
+                    #print(f"Creating maze: {maze}")
+                    if(peer != p and peer != own_address):
+                        message = f"maze {maze}"
+                        sock.sendto(message.encode('utf-8'), peer)
+                        print(f"Sending {maze} to {peer}")
+
 
 if __name__ == "__main__":
     main()
+
+
+    
+
+
+
