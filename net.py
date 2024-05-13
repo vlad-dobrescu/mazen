@@ -15,7 +15,7 @@ SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 700
 SCREEN_TITLE = "Maze Depth First Example"
 
-MOVEMENT_SPEED = 8
+MOVEMENT_SPEED = 4
 
 TILE_EMPTY = 0
 TILE_CRATE = 1
@@ -23,8 +23,8 @@ TILE_CRATE = 1
 # Maze must have an ODD number of rows and columns.
 # Walls go on EVEN rows/columns.
 # Openings go on ODD rows/columns
-MAZE_HEIGHT = 9
-MAZE_WIDTH = 9
+MAZE_HEIGHT = 11
+MAZE_WIDTH = 11
 
 MERGE_SPRITES = True
 
@@ -109,7 +109,8 @@ def create_maze(maze_width, maze_height):
 
 class MyGame(arcade.Window):
     """ Main application class. """
-    def __init__(self, width, height, title, maze):
+    #global array of players
+    def __init__(self, width, height, title, maze, keep_track):
         """
         Initializer
         """
@@ -123,7 +124,6 @@ class MyGame(arcade.Window):
         os.chdir(file_path)
 
         # Sprite lists
-        self.player_list = None
         self.wall_list = None
 
         # Player info
@@ -140,6 +140,8 @@ class MyGame(arcade.Window):
         # Time to process
         self.processing_time = 0
         self.draw_time = 0
+        
+
 
     def setup(self):
         """ Set up the game and initialize the variables. """
@@ -164,6 +166,7 @@ class MyGame(arcade.Window):
                                            "femalePerson_idle.png",
                                            SPRITE_SCALING)
         self.player_list.append(self.player_sprite)
+            
 
         # Randomly place the player. If we are in a wall, repeat until we aren't.
         placed = False
@@ -177,6 +180,7 @@ class MyGame(arcade.Window):
                     self.player_sprite.center_y = row * SPRITE_SIZE + SPRITE_SIZE / 2
                     placed = True
                     break
+
             # Are we in a wall?
             # walls_hit = arcade.check_for_collision_with_list(self.player_sprite, self.wall_list)
             # if len(walls_hit) == 0:
@@ -185,6 +189,7 @@ class MyGame(arcade.Window):
 
   
         self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list)
+        #physics_engine = arcade.PhysicsEngineSimple(, self.wall_list)
 
         # Set the background color
         arcade.set_background_color(arcade.color.AMAZON)
@@ -194,6 +199,8 @@ class MyGame(arcade.Window):
         self.view_left = 0
         self.view_bottom = 0
         print(f"Total wall blocks: {len(self.wall_list)}")
+
+        threading.Thread(target=self.send_position_update, daemon=True).start()
 
     def on_draw(self):
         """
@@ -253,6 +260,14 @@ class MyGame(arcade.Window):
         elif key == arcade.key.LEFT or key == arcade.key.RIGHT:
             self.player_sprite.change_x = 0
 
+    def send_position_update(self):
+        while True:
+            if self.player_sprite:
+                pos_msg = f"pos_update {own_address[0]}:{own_address[1]} {self.player_sprite.center_x} {self.player_sprite.center_y}"
+                send_message(sock, pos_msg)
+            time.sleep(0.1)  # Update position every 100 ms
+
+
     def on_update(self, delta_time):
         """ Movement and game logic """
 
@@ -261,6 +276,7 @@ class MyGame(arcade.Window):
         # Call update on all sprites (The sprites don't do much in this
         # example though.)
         self.physics_engine.update()
+
 
         # --- Manage Scrolling ---
 
@@ -300,6 +316,9 @@ class MyGame(arcade.Window):
 
         # Save the time it took to do this.
         self.processing_time = timeit.default_timer() - start_time
+     
+    
+
 
 def send_maze(sock):
     for peer in keep_track:
@@ -307,7 +326,7 @@ def send_maze(sock):
             #print(f"Creating maze: {maze}")
             message = f"maze {maze}"
             sock.sendto(message.encode('utf-8'), peer)
-            print(f"Sending {maze} to {peer}")
+            #print(f"Sending {maze} to {peer}")
 
 
 def get_host_ip():
@@ -322,7 +341,8 @@ def get_host_ip():
     return IP
 
 def receive_messages(sock):
-    global recv_maze
+    global recv_maze, peer_positions
+    peer_positions = {}
     while True:
         data, addr = sock.recvfrom(2048)
         message = data.decode('utf-8')
@@ -330,12 +350,20 @@ def receive_messages(sock):
         if message.startswith("maze"):
             #strip message to "maze " and the rest 
             recv_maze = message[5:]
-            print(f"Received maze from {addr}: {recv_maze}")
+            #print(f"Received maze from {addr}: {recv_maze}")
         if message.startswith("status"):
             _, ip, port, status = message.split()
             peer = (ip, int(port))
             keep_track[peer] = status
             #print(f"Status update from {peer}: {status}   pllllll")
+        if message.startswith("pos_update"):
+            print(f"posupdate {message}")
+            _, pid, x, y = message.split()
+            ip, port = pid.split(':')
+            peer_positions[pid] = (float(x), float(y))
+
+            
+            print(f"Position update from {pid}: {x}, {y}")
         if addr not in peers:
             peers.append(addr)
             keep_track[addr] = '1'
@@ -343,7 +371,7 @@ def receive_messages(sock):
             send_maze(sock)
         if(len(peers) == 1):
             keep_track[addr] = '2'
-            print(f"Updated host to {addr}")
+            #print(f"Updated host to {addr}")
 
         last_seen[addr] = time.time()
 
@@ -444,7 +472,7 @@ def main():
     #broadcast_port = input("Enter the port you want to connect to (Type 0 if none): ")
 
     global peers, last_seen, keep_track, own_address, sock, maze, recv_maze
-    own_address = (host, port)
+    own_address = (host,port)
     keep_track = {(host, port): '1'}
     peers = [(host, port)]
     last_seen = {(host, port): time.time()}
@@ -455,22 +483,20 @@ def main():
 
     announce_presence(sock, port)
     
-    
+
 
     threading.Thread(target=receive_messages, args=(sock,)).start()
     threading.Thread(target=update, args=()).start()
     threading.Thread(target=handle_user_input, args=(sock,)).start()
     threading.Thread(target=heartbeat, args=(sock, port)).start()
 
-    time.sleep(1)
-
     if(keep_track[own_address] == '2'):
         maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
     else:
         #convert string to list
-        maze = eval(recv_maze)
+        maze = eval(recv_maze) 
 
-    window = MyGame(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, maze)
+    window = MyGame(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, maze, keep_track)
     window.setup()
     arcade.run()
 
