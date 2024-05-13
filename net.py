@@ -318,8 +318,6 @@ class MyGame(arcade.Window):
         self.processing_time = timeit.default_timer() - start_time
      
     
-
-
 def send_maze(sock):
     for peer in keep_track:
         if(keep_track[own_address] == '2' and peer != own_address):
@@ -377,7 +375,9 @@ def receive_messages(sock):
 
 def send_message(sock, message):
     for peer in peers:
-        sock.sendto(message.encode('utf-8'), peer)
+        if(peer != own_address):
+            #print(f"Sending message to {peer}: {message}"
+            sock.sendto(message.encode('utf-8'), peer)
 
 def send_status(sock):
     for peer in peers:
@@ -462,7 +462,6 @@ def update():
         time.sleep(5)
         update_host_peer()
         send_status(sock)
-time.sleep(1)
 
 def main():
     host = get_host_ip()
@@ -489,6 +488,8 @@ def main():
     threading.Thread(target=update, args=()).start()
     threading.Thread(target=handle_user_input, args=(sock,)).start()
     threading.Thread(target=heartbeat, args=(sock, port)).start()
+
+    time.sleep(1)
 
     if(keep_track[own_address] == '2'):
         maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
