@@ -224,6 +224,7 @@ class MyGame(arcade.Window):
 
         global game_started
         if not game_started:
+            
             output = f"Game starting in {self.countdown} seconds"
             
             arcade.draw_text(output, 500, 500, arcade.color.WHITE, 16)
@@ -310,6 +311,7 @@ class MyGame(arcade.Window):
                 send_message(sock, "game_started")
                 self.physics_engine.update()
 
+        self.countdown = countdown
         # --- Manage Scrolling ---
 
         # Track if we need to change the viewport
@@ -412,10 +414,13 @@ def receive_messages(sock):
         last_seen[addr] = time.time()
 
 def send_message(sock, message):
+    if(message.startswith("countdown")):
+        sock.sendto(message.encode('utf-8'), own_address)
     for peer in peers:
         if(peer != own_address):
             #print(f"Sending message to {peer}: {message}"
             sock.sendto(message.encode('utf-8'), peer)
+    
 
 def send_status(sock):
     for peer in peers:
