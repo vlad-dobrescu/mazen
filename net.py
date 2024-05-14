@@ -23,8 +23,8 @@ TILE_CRATE = 1
 # Maze must have an ODD number of rows and columns.
 # Walls go on EVEN rows/columns.
 # Openings go on ODD rows/columns
-MAZE_HEIGHT = 11
-MAZE_WIDTH = 11
+MAZE_HEIGHT = 25
+MAZE_WIDTH = 25
 
 MERGE_SPRITES = True
 
@@ -217,6 +217,11 @@ class MyGame(arcade.Window):
         self.wall_list.draw()
         self.player_list.draw()
 
+        for pid, position in peer_positions.items():
+            if pid != own_address:  # Do not draw self
+                #print(f"Drawing peer at {position}")
+                arcade.draw_circle_filled(position[0], position[1], SPRITE_SIZE / 3, arcade.color.BLUE)
+
         # Draw info on the screen
         sprite_count = len(self.wall_list)
 
@@ -355,13 +360,13 @@ def receive_messages(sock):
             keep_track[peer] = status
             #print(f"Status update from {peer}: {status}   pllllll")
         if message.startswith("pos_update"):
-            print(f"posupdate {message}")
+            #print(f"posupdate {message}")
             _, pid, x, y = message.split()
             ip, port = pid.split(':')
             peer_positions[pid] = (float(x), float(y))
 
             
-            print(f"Position update from {pid}: {x}, {y}")
+            #print(f"Position update from {pid}: {x}, {y}")
         if addr not in peers:
             peers.append(addr)
             keep_track[addr] = '1'
