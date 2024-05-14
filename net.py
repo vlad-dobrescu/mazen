@@ -10,6 +10,7 @@ import os
 NATIVE_SPRITE_SIZE = 128
 SPRITE_SCALING = 0.25
 SPRITE_SIZE = int(NATIVE_SPRITE_SIZE * SPRITE_SCALING)
+game_started = False
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 700
@@ -272,17 +273,27 @@ class MyGame(arcade.Window):
                 send_message(sock, pos_msg)
             time.sleep(0.1)  # Update position every 100 ms
 
-
+    def initial_timer(self):
+        global game_started
+        time.sleep(10)
+        game_started = True
+        
     def on_update(self, delta_time):
         """ Movement and game logic """
+        global game_started
 
         start_time = timeit.default_timer()
 
         # Call update on all sprites (The sprites don't do much in this
         # example though.)
-        self.physics_engine.update()
+        #call initial timer to start game
+        #TypeError: __main__.MyGame.initial_timer() argument after * must be an iterable, not MyGame
+        if(keep_track[own_address] == '2'):
+            threading.Thread(target=self.initial_timer).start()
 
-
+        if game_started:
+            send_message(sock, "game_started")
+            self.physics_engine.update()
         # --- Manage Scrolling ---
 
         # Track if we need to change the viewport
@@ -344,7 +355,7 @@ def get_host_ip():
     return IP
 
 def receive_messages(sock):
-    global recv_maze, peer_positions
+    global recv_maze, peer_positions, game_started
     peer_positions = {}
     while True:
         data, addr = sock.recvfrom(2048)
@@ -354,6 +365,8 @@ def receive_messages(sock):
             #strip message to "maze " and the rest 
             recv_maze = message[5:]
             #print(f"Received maze from {addr}: {recv_maze}")
+        if message.startswith("game_started"):
+            game_started = True
         if message.startswith("status"):
             _, ip, port, status = message.split()
             peer = (ip, int(port))
