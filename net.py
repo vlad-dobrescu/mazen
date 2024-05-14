@@ -143,7 +143,7 @@ class MyGame(arcade.Window):
         self.processing_time = 0
         self.draw_time = 0
 
-        self.countdown = countdown
+        self.countdown = 10
         self.start_time = time.time()
         
 
@@ -225,6 +225,7 @@ class MyGame(arcade.Window):
         global game_started
         if not game_started:
             output = f"Game starting in {self.countdown} seconds"
+            
             arcade.draw_text(output, 500, 500, arcade.color.WHITE, 16)
         
 
@@ -282,18 +283,7 @@ class MyGame(arcade.Window):
                 pos_msg = f"pos_update {own_address[0]}:{own_address[1]} {self.player_sprite.center_x} {self.player_sprite.center_y}"
                 send_message(sock, pos_msg)
             time.sleep(0.1)  # Update position every 100 ms
-
-    def initial_timer(self):
-        global game_started, countdown
-        t = 10
-        while t > 0:
-            time.sleep(1)
-            countdown = t
-            t -= 1
-        game_started = True
-        print("Game started!")  # Debug message
-        
-        
+                
     def on_update(self, delta_time):
         """ Movement and game logic """
 
@@ -305,22 +295,21 @@ class MyGame(arcade.Window):
         #call initial timer to start game
         #TypeError: __main__.MyGame.initial_timer() argument after * must be an iterable, not MyGame
         global game_started
-        if not game_started:
-            elapsed_time = time.time() - self.start_time
-            self.countdown = max(0, countdown - int(elapsed_time))
-            if self.countdown == 0:
-                game_started = True
-                print("Game started!")  # Debug message
+        if(keep_track[own_address] == '2'):
+            if not game_started:
+                elapsed_time = time.time() - self.start_time #time elapsed since game started
 
-        if game_started:
-            self.physics_engine.update()
+                self.countdown = max(0, 10 - int(elapsed_time)) #countdown from 10 to 0
+                
+                send_message(sock, f"countdown {self.countdown}")
+                if self.countdown == 0:
+                    game_started = True
+                    print("Game started!")  # Debug message
 
-            
-            
+            if game_started:
+                send_message(sock, "game_started")
+                self.physics_engine.update()
 
-        if game_started:
-            send_message(sock, "game_started")
-            self.physics_engine.update()
         # --- Manage Scrolling ---
 
         # Track if we need to change the viewport
@@ -382,7 +371,7 @@ def get_host_ip():
     return IP
 
 def receive_messages(sock):
-    global recv_maze, peer_positions, game_started
+    global recv_maze, peer_positions, game_started, countdown
     peer_positions = {}
     while True:
         data, addr = sock.recvfrom(2048)
@@ -392,6 +381,10 @@ def receive_messages(sock):
             #strip message to "maze " and the rest 
             recv_maze = message[5:]
             #print(f"Received maze from {addr}: {recv_maze}")
+        if message.startswith("countdown"):
+            _, count = message.split()
+            print(f"Countdown: {count}")
+            countdown = int(count)
         if message.startswith("game_started"):
             game_started = True
         if message.startswith("status"):
