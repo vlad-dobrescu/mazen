@@ -11,7 +11,7 @@ NATIVE_SPRITE_SIZE = 128
 SPRITE_SCALING = 0.25
 SPRITE_SIZE = int(NATIVE_SPRITE_SIZE * SPRITE_SCALING)
 game_started = False
-countdown = 10
+countdown = 3
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 700
@@ -25,8 +25,8 @@ TILE_CRATE = 1
 # Maze must have an ODD number of rows and columns.
 # Walls go on EVEN rows/columns.
 # Openings go on ODD rows/columns
-MAZE_HEIGHT = 25
-MAZE_WIDTH = 25
+MAZE_HEIGHT = 11
+MAZE_WIDTH = 11
 
 MERGE_SPRITES = True
 
@@ -145,7 +145,9 @@ class MyGame(arcade.Window):
 
         self.countdown = 10
         self.start_time = time.time()
-        
+
+        self.last_row = None
+        self.last_column = None
 
 
     def setup(self):
@@ -177,21 +179,32 @@ class MyGame(arcade.Window):
         placed = False
         while not placed:
 
+            for row in reversed(range(MAZE_HEIGHT)):
+              for column in reversed(range(MAZE_WIDTH)):
+                if maze[row][column] == 0:
+                    self.last_row = column * SPRITE_SIZE + SPRITE_SIZE / 2
+                    self.last_column = row * SPRITE_SIZE + SPRITE_SIZE / 2
+                    break
+
             # Randomly position
-          for row in range(MAZE_HEIGHT):
+            for row in range(MAZE_HEIGHT):
               for column in range(MAZE_WIDTH):
                 if maze[row][column] == 0:
                     self.player_sprite.center_x = column * SPRITE_SIZE + SPRITE_SIZE / 2
                     self.player_sprite.center_y = row * SPRITE_SIZE + SPRITE_SIZE / 2
+                    #print( column * SPRITE_SIZE + SPRITE_SIZE / 2, row * SPRITE_SIZE + SPRITE_SIZE / 2)
                     placed = True
                     break
-
+        
             # Are we in a wall?
             # walls_hit = arcade.check_for_collision_with_list(self.player_sprite, self.wall_list)
             # if len(walls_hit) == 0:
             #     # Not in a wall! Success!
             #     placed = True
 
+
+        
+        
   
         self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list)
         #physics_engine = arcade.PhysicsEngineSimple(, self.wall_list)
@@ -205,6 +218,7 @@ class MyGame(arcade.Window):
         self.view_bottom = 0
         print(f"Total wall blocks: {len(self.wall_list)}")
 
+        
         threading.Thread(target=self.send_position_update, daemon=True).start()
 
     def on_draw(self):
@@ -221,6 +235,10 @@ class MyGame(arcade.Window):
         # Draw all the sprites.
         self.wall_list.draw()
         self.player_list.draw()
+        #print(f"Drawing player at {self.player_sprite.center_x}, {self.player_sprite.center_y}")
+        if(self.player_sprite.center_x >= self.last_row - 10 and self.player_sprite.center_x <= self.last_row + 10 and self.player_sprite.center_y == self.last_column):
+            print("You win!")
+            arcade.draw_text("You win!", 500, 500, arcade.color.WHITE, 16)
 
         global game_started
         if not game_started:
@@ -228,12 +246,30 @@ class MyGame(arcade.Window):
             output = f"Game starting in {self.countdown} seconds"
             
             arcade.draw_text(output, 500, 500, arcade.color.WHITE, 16)
-        
+
+        # last_row, last_column = None, None
+        # for row in reversed(range(MAZE_HEIGHT)):
+        #     for column in reversed(range(MAZE_WIDTH)):
+        #         if maze[row][column] == TILE_EMPTY:
+        #             last_row = row
+        #             last_column = column
+        #             break  # Break the inner loop
+        #     if last_row is not None and last_column is not None:
+        #         break  # Break the outer loop if a free cell is found 
+
+        # if last_row is not None and last_column is not None:
+        #     print(f"Last row: {last_row}, Last column: {last_column}")           
+
 
         for pid, position in peer_positions.items():
             if pid != own_address:  # Do not draw self
                 #print(f"Drawing peer at {position}")
+                if(position[0] >= self.last_row - 10 and position[0] <= self.last_row + 10 and position[1] == self.last_column):
+                    print(f"{pid} Peer wins!")
+                    arcade.draw_text("Peer wins!", 500, 500, arcade.color.WHITE, 16)
                 arcade.draw_circle_filled(position[0], position[1], SPRITE_SIZE / 3, arcade.color.BLUE)
+           
+                
 
         # Draw info on the screen
         sprite_count = len(self.wall_list)
@@ -300,16 +336,16 @@ class MyGame(arcade.Window):
             if not game_started:
                 elapsed_time = time.time() - self.start_time #time elapsed since game started
 
-                self.countdown = max(0, 10 - int(elapsed_time)) #countdown from 10 to 0
+                self.countdown = max(0, 5 - int(elapsed_time)) #countdown from 10 to 0
                 
                 send_message(sock, f"countdown {self.countdown}")
                 if self.countdown == 0:
                     game_started = True
                     print("Game started!")  # Debug message
 
-            if game_started:
-                send_message(sock, "game_started")
-                self.physics_engine.update()
+        if game_started:
+            send_message(sock, "game_started")
+            self.physics_engine.update()
 
         self.countdown = countdown
         # --- Manage Scrolling ---
@@ -385,7 +421,7 @@ def receive_messages(sock):
             #print(f"Received maze from {addr}: {recv_maze}")
         if message.startswith("countdown"):
             _, count = message.split()
-            print(f"Countdown: {count}")
+            #print(f"Countdown: {count}")
             countdown = int(count)
         if message.startswith("game_started"):
             game_started = True
