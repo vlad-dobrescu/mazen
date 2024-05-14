@@ -11,12 +11,13 @@ NATIVE_SPRITE_SIZE = 128
 SPRITE_SCALING = 0.25
 SPRITE_SIZE = int(NATIVE_SPRITE_SIZE * SPRITE_SCALING)
 game_started = False
+countdown = 10
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 700
 SCREEN_TITLE = "Maze Depth First Example"
 
-MOVEMENT_SPEED = 4
+MOVEMENT_SPEED = 2
 
 TILE_EMPTY = 0
 TILE_CRATE = 1
@@ -141,6 +142,9 @@ class MyGame(arcade.Window):
         # Time to process
         self.processing_time = 0
         self.draw_time = 0
+
+        self.countdown = countdown
+        self.start_time = time.time()
         
 
 
@@ -218,6 +222,12 @@ class MyGame(arcade.Window):
         self.wall_list.draw()
         self.player_list.draw()
 
+        global game_started
+        if not game_started:
+            output = f"Game starting in {self.countdown} seconds"
+            arcade.draw_text(output, 500, 500, arcade.color.WHITE, 16)
+        
+
         for pid, position in peer_positions.items():
             if pid != own_address:  # Do not draw self
                 #print(f"Drawing peer at {position}")
@@ -274,13 +284,19 @@ class MyGame(arcade.Window):
             time.sleep(0.1)  # Update position every 100 ms
 
     def initial_timer(self):
-        global game_started
-        time.sleep(10)
+        global game_started, countdown
+        t = 10
+        while t > 0:
+            time.sleep(1)
+            countdown = t
+            t -= 1
         game_started = True
+        print("Game started!")  # Debug message
+        
         
     def on_update(self, delta_time):
         """ Movement and game logic """
-        global game_started
+
 
         start_time = timeit.default_timer()
 
@@ -288,8 +304,19 @@ class MyGame(arcade.Window):
         # example though.)
         #call initial timer to start game
         #TypeError: __main__.MyGame.initial_timer() argument after * must be an iterable, not MyGame
-        if(keep_track[own_address] == '2'):
-            threading.Thread(target=self.initial_timer).start()
+        global game_started
+        if not game_started:
+            elapsed_time = time.time() - self.start_time
+            self.countdown = max(0, countdown - int(elapsed_time))
+            if self.countdown == 0:
+                game_started = True
+                print("Game started!")  # Debug message
+
+        if game_started:
+            self.physics_engine.update()
+
+            
+            
 
         if game_started:
             send_message(sock, "game_started")
