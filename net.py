@@ -231,14 +231,18 @@ class MyGame(arcade.Window):
         draw_start_time = timeit.default_timer()
         
         # Draw all the sprites.
+        if keep_track[own_address] == '2':
+            print(f"Drawing maze: {maze}")
         self.wall_list.draw()
         self.player_list.draw()
         #print(f"Drawing player at {self.player_sprite.center_x}, {self.player_sprite.center_y}")
+        
         if(self.player_sprite.center_x >= self.last_row - 10 and self.player_sprite.center_x <= self.last_row + 10 and self.player_sprite.center_y == self.last_column):
             #print("You win!")
             game_started = False
             arcade.draw_text("You win!", 500, 500, arcade.color.WHITE, 16)
             game_won = True
+            send_message(sock, "game_won")
 
         
         if not game_started:
@@ -251,22 +255,23 @@ class MyGame(arcade.Window):
                 #print(f"Drawing peer at {position}")
                 if(position[0] >= self.last_row - 10 and position[0] <= self.last_row + 10 and position[1] == self.last_column):
                     print(f"{pid} Peer wins!")
+
                     game_won = True
                     send_message(sock, f"game_won")
+
                     self.countdown = 10
                     game_started = False
-                    self.setup()
                     arcade.draw_text("Peer wins!", 500, 500, arcade.color.WHITE, 16)
                     
                 arcade.draw_circle_filled(position[0], position[1], SPRITE_SIZE / 3, arcade.color.BLUE)
+
         if game_won:
             game_won = False
             if keep_track[own_address] == '2':
                 maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
                 send_maze(sock)
                 self.countdown = 10
-                self.setup()
-            
+           
             self.countdown = 10
             self.setup()
 
@@ -395,9 +400,9 @@ def receive_messages(sock):
         if message.startswith("maze"):
             #strip message to "maze " and the rest 
             recv_maze = message[5:]
-            print(f"Received maze from {addr}: {recv_maze}")
-            maze = eval(recv_maze)
             #print(f"Received maze from {addr}: {recv_maze}")
+            maze = eval(recv_maze)
+            print(f"Received maze from {addr}: {recv_maze}")
         if message.startswith("countdown"):
             _, count = message.split()
             #print(f"Countdown: {count}")
@@ -416,12 +421,6 @@ def receive_messages(sock):
             peer_positions[pid] = (float(x), float(y))
         if message == "game_won":
             game_won = True
-            if keep_track[own_address] != '2':  # If not the host, request the maze from the host
-                send_message(sock, "request_maze")
-        if message == "request_maze" and keep_track[own_address] == '2':
-            send_maze(sock)
-
-            
             #print(f"Position update from {pid}: {x}, {y}")
         if addr not in peers:
             peers.append(addr)
