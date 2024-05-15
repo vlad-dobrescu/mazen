@@ -27,8 +27,8 @@ TILE_CRATE = 1
 # Maze must have an ODD number of rows and columns.
 # Walls go on EVEN rows/columns.
 # Openings go on ODD rows/columns
-MAZE_HEIGHT = 27
-MAZE_WIDTH = 27
+MAZE_HEIGHT = 21
+MAZE_WIDTH = 21
 
 MERGE_SPRITES = True
 
@@ -188,7 +188,7 @@ class MyGame(arcade.Window):
 
         # Set up the player
         self.player_sprite = arcade.Sprite("./zombie.png",
-                                           SPRITE_SCALING - 0.03)
+                                           SPRITE_SCALING + 0.1)
         self.player_list.append(self.player_sprite)
             
 
@@ -261,7 +261,7 @@ class MyGame(arcade.Window):
         
         if not game_started:
             output = f"Game starting in {self.countdown} seconds"
-            arcade.draw_text(output, 100, 1300, arcade.color.RED, 30)         
+            arcade.draw_text(output, 100, 1000, arcade.color.RED, 30)         
 
 
         for pid, position in peer_positions.items():
@@ -282,7 +282,7 @@ class MyGame(arcade.Window):
                 # Load the image for the sprite
                 peer_sprite = arcade.Sprite()
                 peer_sprite.texture = peer_texture
-                peer_sprite.scale = SPRITE_SCALING - 0.183
+                peer_sprite.scale = SPRITE_SCALING - 0.09
                 peer_sprite.set_position(position[0], position[1])
                 
                 # Draw the peer sprite
