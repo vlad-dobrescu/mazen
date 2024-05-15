@@ -12,12 +12,14 @@ SPRITE_SCALING = 0.25
 SPRITE_SIZE = int(NATIVE_SPRITE_SIZE * SPRITE_SCALING)
 game_started = False
 countdown = 3
+maze = None
+game_won = False
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 700
 SCREEN_TITLE = "Maze Depth First Example"
 
-MOVEMENT_SPEED = 2
+MOVEMENT_SPEED = 4
 
 TILE_EMPTY = 0
 TILE_CRATE = 1
@@ -152,7 +154,8 @@ class MyGame(arcade.Window):
 
     def setup(self):
         """ Set up the game and initialize the variables. """
-        print(maze)
+        global maze, game_won
+        #print(maze)
         # Sprite lists
         self.player_list = arcade.SpriteList()
         self.wall_list = arcade.SpriteList()
@@ -201,11 +204,6 @@ class MyGame(arcade.Window):
             # if len(walls_hit) == 0:
             #     # Not in a wall! Success!
             #     placed = True
-
-
-        
-        
-  
         self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list)
         #physics_engine = arcade.PhysicsEngineSimple(, self.wall_list)
 
@@ -225,40 +223,27 @@ class MyGame(arcade.Window):
         """
         Render the screen.
         """
-
+        global game_started, maze, game_won
         # This command has to happen before we start drawing
         self.clear()
 
         # Start timing how long this takes
         draw_start_time = timeit.default_timer()
-
+        
         # Draw all the sprites.
         self.wall_list.draw()
         self.player_list.draw()
         #print(f"Drawing player at {self.player_sprite.center_x}, {self.player_sprite.center_y}")
         if(self.player_sprite.center_x >= self.last_row - 10 and self.player_sprite.center_x <= self.last_row + 10 and self.player_sprite.center_y == self.last_column):
-            print("You win!")
+            #print("You win!")
+            game_started = False
             arcade.draw_text("You win!", 500, 500, arcade.color.WHITE, 16)
+            game_won = True
 
-        global game_started
+        
         if not game_started:
-            
             output = f"Game starting in {self.countdown} seconds"
-            
-            arcade.draw_text(output, 500, 500, arcade.color.WHITE, 16)
-
-        # last_row, last_column = None, None
-        # for row in reversed(range(MAZE_HEIGHT)):
-        #     for column in reversed(range(MAZE_WIDTH)):
-        #         if maze[row][column] == TILE_EMPTY:
-        #             last_row = row
-        #             last_column = column
-        #             break  # Break the inner loop
-        #     if last_row is not None and last_column is not None:
-        #         break  # Break the outer loop if a free cell is found 
-
-        # if last_row is not None and last_column is not None:
-        #     print(f"Last row: {last_row}, Last column: {last_column}")           
+            arcade.draw_text(output, 500, 500, arcade.color.WHITE, 16)         
 
 
         for pid, position in peer_positions.items():
@@ -266,32 +251,26 @@ class MyGame(arcade.Window):
                 #print(f"Drawing peer at {position}")
                 if(position[0] >= self.last_row - 10 and position[0] <= self.last_row + 10 and position[1] == self.last_column):
                     print(f"{pid} Peer wins!")
+                    game_won = True
+                    send_message(sock, f"game_won")
+                    self.countdown = 10
+                    game_started = False
+                    self.setup()
                     arcade.draw_text("Peer wins!", 500, 500, arcade.color.WHITE, 16)
+                    
                 arcade.draw_circle_filled(position[0], position[1], SPRITE_SIZE / 3, arcade.color.BLUE)
-           
+        if game_won:
+            game_won = False
+            if keep_track[own_address] == '2':
+                maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
+                send_maze(sock)
+                self.countdown = 10
+                self.setup()
+            
+            self.countdown = 10
+            self.setup()
+
                 
-
-        # Draw info on the screen
-        sprite_count = len(self.wall_list)
-
-        output = f"Sprite Count: {sprite_count}"
-        arcade.draw_text(output,
-                         self.view_left + 20,
-                         SCREEN_HEIGHT - 20 + self.view_bottom,
-                         arcade.color.WHITE, 16)
-
-        output = f"Drawing time: {self.draw_time:.3f}"
-        arcade.draw_text(output,
-                         self.view_left + 20,
-                         SCREEN_HEIGHT - 40 + self.view_bottom,
-                         arcade.color.WHITE, 16)
-
-        output = f"Processing time: {self.processing_time:.3f}"
-        arcade.draw_text(output,
-                         self.view_left + 20,
-                         SCREEN_HEIGHT - 60 + self.view_bottom,
-                         arcade.color.WHITE, 16)
-
         self.draw_time = timeit.default_timer() - draw_start_time
 
     def on_key_press(self, key, modifiers):
@@ -323,8 +302,6 @@ class MyGame(arcade.Window):
                 
     def on_update(self, delta_time):
         """ Movement and game logic """
-
-
         start_time = timeit.default_timer()
 
         # Call update on all sprites (The sprites don't do much in this
@@ -409,7 +386,7 @@ def get_host_ip():
     return IP
 
 def receive_messages(sock):
-    global recv_maze, peer_positions, game_started, countdown
+    global recv_maze, peer_positions, game_started, countdown, maze, game_won
     peer_positions = {}
     while True:
         data, addr = sock.recvfrom(2048)
@@ -418,6 +395,8 @@ def receive_messages(sock):
         if message.startswith("maze"):
             #strip message to "maze " and the rest 
             recv_maze = message[5:]
+            print(f"Received maze from {addr}: {recv_maze}")
+            maze = eval(recv_maze)
             #print(f"Received maze from {addr}: {recv_maze}")
         if message.startswith("countdown"):
             _, count = message.split()
@@ -435,6 +414,12 @@ def receive_messages(sock):
             _, pid, x, y = message.split()
             ip, port = pid.split(':')
             peer_positions[pid] = (float(x), float(y))
+        if message == "game_won":
+            game_won = True
+            if keep_track[own_address] != '2':  # If not the host, request the maze from the host
+                send_message(sock, "request_maze")
+        if message == "request_maze" and keep_track[own_address] == '2':
+            send_maze(sock)
 
             
             #print(f"Position update from {pid}: {x}, {y}")
