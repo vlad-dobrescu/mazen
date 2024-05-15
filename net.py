@@ -7,8 +7,8 @@ import timeit
 import os
 
 
-NATIVE_SPRITE_SIZE = 128
-SPRITE_SCALING = 0.25
+NATIVE_SPRITE_SIZE = 165
+SPRITE_SCALING = 0.28
 SPRITE_SIZE = int(NATIVE_SPRITE_SIZE * SPRITE_SCALING)
 game_started = False
 countdown = 3
@@ -19,7 +19,7 @@ SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 700
 SCREEN_TITLE = "Maze Depth First Example"
 
-MOVEMENT_SPEED = 4
+MOVEMENT_SPEED = 5
 
 TILE_EMPTY = 0
 TILE_CRATE = 1
@@ -27,8 +27,8 @@ TILE_CRATE = 1
 # Maze must have an ODD number of rows and columns.
 # Walls go on EVEN rows/columns.
 # Openings go on ODD rows/columns
-MAZE_HEIGHT = 11
-MAZE_WIDTH = 11
+MAZE_HEIGHT = 27
+MAZE_WIDTH = 27
 
 MERGE_SPRITES = True
 
@@ -118,7 +118,7 @@ class MyGame(arcade.Window):
         """
         Initializer
         """
-        super().__init__(width, height, title)
+        super().__init__(width, height, title, resizable=True)
 
         # Set the working directory (where we expect to find files) to the same
         # directory this .py file is in. You can leave this out of your own
@@ -162,19 +162,33 @@ class MyGame(arcade.Window):
 
         self.score = 0
 
- 
+
         for row in range(MAZE_HEIGHT):
             for column in range(MAZE_WIDTH):
                 if maze[row][column] == 1:
-                    wall = arcade.Sprite(":resources:images/tiles/grassCenter.png", SPRITE_SCALING)
+                    # Always initialize wall with a default to handle all cases.
+                    wall = arcade.Sprite("./black_80x150.png", SPRITE_SCALING)
+
+                    # Handle corners with specific sprite
+                    if (row == 0 and column == 0) or (row == 0 and column == MAZE_WIDTH - 1) \
+                    or (row == MAZE_HEIGHT - 1 and column == 0) or (row == MAZE_HEIGHT - 1 and column == MAZE_WIDTH - 1):
+                        wall = arcade.Sprite("./80x80.png", SPRITE_SCALING)
+                    elif column - 1 >= 0 and column + 1 < MAZE_WIDTH:
+                        if maze[row][column+1] == 1 or maze[row][column-1] == 1:
+                            if maze[row][column+1] == 1 and maze[row][column-1] == 1:
+                                wall = arcade.Sprite("./black_150x80.png", SPRITE_SCALING)
+                            else:
+                                wall = arcade.Sprite("./80x80.png", SPRITE_SCALING)
+
                     wall.center_x = column * SPRITE_SIZE + SPRITE_SIZE / 2
                     wall.center_y = row * SPRITE_SIZE + SPRITE_SIZE / 2
                     self.wall_list.append(wall)
 
+
+
         # Set up the player
-        self.player_sprite = arcade.Sprite(":resources:images/animated_characters/female_person/"
-                                           "femalePerson_idle.png",
-                                           SPRITE_SCALING)
+        self.player_sprite = arcade.Sprite("./zombie.png",
+                                           SPRITE_SCALING - 0.03)
         self.player_list.append(self.player_sprite)
             
 
@@ -208,21 +222,22 @@ class MyGame(arcade.Window):
         #physics_engine = arcade.PhysicsEngineSimple(, self.wall_list)
 
         # Set the background color
-        arcade.set_background_color(arcade.color.AMAZON)
+        arcade.set_background_color(arcade.color.WHITE)
 
         # Set the viewport boundaries
         # These numbers set where we have 'scrolled' to.
         self.view_left = 0
         self.view_bottom = 0
-        print(f"Total wall blocks: {len(self.wall_list)}")
+        #print(f"Total wall blocks: {len(self.wall_list)}")
 
-        
+        print(f"{self.last_row}, {self.last_column}")
         threading.Thread(target=self.send_position_update, daemon=True).start()
 
     def on_draw(self):
         """
         Render the screen.
         """
+        peer_texture = arcade.load_texture("./male_adv.png")
         global game_started, maze, game_won
         # This command has to happen before we start drawing
         self.clear()
@@ -231,48 +246,55 @@ class MyGame(arcade.Window):
         draw_start_time = timeit.default_timer()
         
         # Draw all the sprites.
-        if keep_track[own_address] == '2':
-            print(f"Drawing maze: {maze}")
+    
         self.wall_list.draw()
         self.player_list.draw()
         #print(f"Drawing player at {self.player_sprite.center_x}, {self.player_sprite.center_y}")
         
-        if(self.player_sprite.center_x >= self.last_row - 10 and self.player_sprite.center_x <= self.last_row + 10 and self.player_sprite.center_y == self.last_column):
-            #print("You win!")
-            game_started = False
-            arcade.draw_text("You win!", 500, 500, arcade.color.WHITE, 16)
+        if(self.player_sprite.center_x >= self.last_row - 50 and self.player_sprite.center_x <= self.last_row + 50 and self.player_sprite.center_y >= self.last_column - 50 and self.player_sprite.center_y <= self.last_column + 50):
             game_won = True
+            game_started = False
             send_message(sock, "game_won")
+            arcade.draw_text("You win!", 100, 100, arcade.color.BLACK, 30)
+            
 
         
         if not game_started:
             output = f"Game starting in {self.countdown} seconds"
-            arcade.draw_text(output, 500, 500, arcade.color.WHITE, 16)         
+            arcade.draw_text(output, 100, 1300, arcade.color.RED, 30)         
 
 
         for pid, position in peer_positions.items():
+        
             if pid != own_address:  # Do not draw self
-                #print(f"Drawing peer at {position}")
-                if(position[0] >= self.last_row - 10 and position[0] <= self.last_row + 10 and position[1] == self.last_column):
-                    print(f"{pid} Peer wins!")
-
+                print(f"Drawing peer at {position}")
+                if(position[0] >= self.last_row - 50 and position[0] <= self.last_row + 50 and position[1] >= self.last_column - 50 and position[1] <= self.last_column + 50):
                     game_won = True
-                    send_message(sock, f"game_won")
-
-                    self.countdown = 10
                     game_started = False
+                    print(f"{pid} Peer wins!")
+                    arcade.draw_text("Peer wins!", 500, 500, arcade.color.WHITE, 16)
+                if game_won:
+                    game_started = False
+                    print(f"{pid} Peer wins!")
                     arcade.draw_text("Peer wins!", 500, 500, arcade.color.WHITE, 16)
                     
-                arcade.draw_circle_filled(position[0], position[1], SPRITE_SIZE / 3, arcade.color.BLUE)
+                #arcade.draw_circle_filled(position[0], position[1], SPRITE_SIZE / 3, arcade.color.BLUE)
+                # Load the image for the sprite
+                peer_sprite = arcade.Sprite()
+                peer_sprite.texture = peer_texture
+                peer_sprite.scale = SPRITE_SCALING - 0.183
+                peer_sprite.set_position(position[0], position[1])
+                
+                # Draw the peer sprite
+                peer_sprite.draw()
 
         if game_won:
+            
             game_won = False
             if keep_track[own_address] == '2':
-                maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
+                #maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
                 send_maze(sock)
-                self.countdown = 10
-           
-            self.countdown = 10
+            self.start_time = time.time()
             self.setup()
 
                 
@@ -314,22 +336,28 @@ class MyGame(arcade.Window):
         #call initial timer to start game
         #TypeError: __main__.MyGame.initial_timer() argument after * must be an iterable, not MyGame
         global game_started
+        #print( game_started)
         if(keep_track[own_address] == '2'):
             if not game_started:
-                elapsed_time = time.time() - self.start_time #time elapsed since game started
-
-                self.countdown = max(0, 5 - int(elapsed_time)) #countdown from 10 to 0
+                #print("ZAZA")
                 
+                elapsed_time = time.time() - self.start_time #time elapsed since game started
+                self.countdown = max(0, 5 - int(elapsed_time)) #countdown from 10 to 0
+                #print(self.countdown)
                 send_message(sock, f"countdown {self.countdown}")
                 if self.countdown == 0:
+                    self.countdown = 5
                     game_started = True
-                    print("Game started!")  # Debug message
+                    print("Game started!")  # Debug messag
+
 
         if game_started:
             send_message(sock, "game_started")
             self.physics_engine.update()
-
+        
+        
         self.countdown = countdown
+        #print(self.countdown)
         # --- Manage Scrolling ---
 
         # Track if we need to change the viewport
@@ -369,7 +397,6 @@ class MyGame(arcade.Window):
         # Save the time it took to do this.
         self.processing_time = timeit.default_timer() - start_time
      
-    
 def send_maze(sock):
     for peer in keep_track:
         if(keep_track[own_address] == '2' and peer != own_address):
@@ -420,8 +447,11 @@ def receive_messages(sock):
             ip, port = pid.split(':')
             peer_positions[pid] = (float(x), float(y))
         if message == "game_won":
+            if keep_track[own_address] == '2':  # If host
+                maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)  # Regenerate maze
+                send_maze(sock)  # Send new maze to all
             game_won = True
-            #print(f"Position update from {pid}: {x}, {y}")
+            game_started = False
         if addr not in peers:
             peers.append(addr)
             keep_track[addr] = '1'
@@ -434,7 +464,7 @@ def receive_messages(sock):
         last_seen[addr] = time.time()
 
 def send_message(sock, message):
-    if(message.startswith("countdown")):
+    if(message.startswith("countdown") or message.startswith("game_won")):
         sock.sendto(message.encode('utf-8'), own_address)
     for peer in peers:
         if(peer != own_address):
