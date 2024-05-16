@@ -5,7 +5,7 @@ import arcade
 import random
 import timeit
 import os
-
+import ast
 
 NATIVE_SPRITE_SIZE = 165
 SPRITE_SCALING = 0.28
@@ -14,9 +14,11 @@ game_started = False
 countdown = 3
 maze = None
 game_won = False
+portals = {}
+#portals obj to store address of peeer , portal location, and whether it is active or not
 
-SCREEN_WIDTH = 1000
-SCREEN_HEIGHT = 700
+SCREEN_WIDTH = 500
+SCREEN_HEIGHT = 300
 SCREEN_TITLE = "Maze Depth First Example"
 
 MOVEMENT_SPEED = 5
@@ -151,14 +153,21 @@ class MyGame(arcade.Window):
         self.last_row = None
         self.last_column = None
 
+        self.drop_portal = False
+
+        self.start_x = None
+        self.start_y = None
+
 
     def setup(self):
         """ Set up the game and initialize the variables. """
-        global maze, game_won
+        global maze, game_won, portals
         #print(maze)
         # Sprite lists
         self.player_list = arcade.SpriteList()
         self.wall_list = arcade.SpriteList()
+        self.portal_list = arcade.SpriteList()
+        self.enemy_portal_list = arcade.SpriteList()
 
         self.score = 0
 
@@ -184,8 +193,6 @@ class MyGame(arcade.Window):
                     wall.center_y = row * SPRITE_SIZE + SPRITE_SIZE / 2
                     self.wall_list.append(wall)
 
-
-
         # Set up the player
         self.player_sprite = arcade.Sprite("./zombie.png",
                                            SPRITE_SCALING + 0.1)
@@ -209,10 +216,12 @@ class MyGame(arcade.Window):
                 if maze[row][column] == 0:
                     self.player_sprite.center_x = column * SPRITE_SIZE + SPRITE_SIZE / 2
                     self.player_sprite.center_y = row * SPRITE_SIZE + SPRITE_SIZE / 2
+                    self.start_x = column * SPRITE_SIZE + SPRITE_SIZE / 2
+                    self.start_y = row * SPRITE_SIZE + SPRITE_SIZE / 2
                     #print( column * SPRITE_SIZE + SPRITE_SIZE / 2, row * SPRITE_SIZE + SPRITE_SIZE / 2)
                     placed = True
                     break
-        
+
             # Are we in a wall?
             # walls_hit = arcade.check_for_collision_with_list(self.player_sprite, self.wall_list)
             # if len(walls_hit) == 0:
@@ -238,18 +247,40 @@ class MyGame(arcade.Window):
         Render the screen.
         """
         peer_texture = arcade.load_texture("./male_adv.png")
-        global game_started, maze, game_won
+        global game_started, maze, game_won, portals
         # This command has to happen before we start drawing
         self.clear()
 
         # Start timing how long this takes
         draw_start_time = timeit.default_timer()
         
-        # Draw all the sprites.
-    
         self.wall_list.draw()
         self.player_list.draw()
-        #print(f"Drawing player at {self.player_sprite.center_x}, {self.player_sprite.center_y}")
+        self.portal_list.draw()
+
+
+        for pid, portal in portals.items():
+            p = arcade.Sprite("./80x80.png", SPRITE_SCALING)
+            #print(f"Creating portal at {portal[0]}, {portal[1]}")
+            p.center_x = portal[0]
+            p.center_y = portal[1]
+            if(pid != own_address):
+                self.enemy_portal_list.append(p)
+            self.portal_list.append(p)
+
+        portals_hit = arcade.check_for_collision_with_list(self.player_sprite, self.enemy_portal_list)
+        if len(portals_hit)  > 0:
+            print(f"Player teleported to {portals_hit[0].center_x}, {portals_hit[0].center_y}")
+            self.player_sprite.center_x = self.start_x
+            self.player_sprite.center_y = self.start_y#portals_hit[0].center_y
+            for pid, portal in portals.items():
+                if portal == (portals_hit[0].center_x, portals_hit[0].center_y):
+                    portals[pid] = (0, 0)
+                    portal_msg = f"portals {portals}"
+                    send_message(sock, portal_msg)
+            
+       # print(portals)
+
         
         if(self.player_sprite.center_x >= self.last_row - 50 and self.player_sprite.center_x <= self.last_row + 50 and self.player_sprite.center_y >= self.last_column - 50 and self.player_sprite.center_y <= self.last_column + 50):
             game_won = True
@@ -267,7 +298,8 @@ class MyGame(arcade.Window):
         for pid, position in peer_positions.items():
         
             if pid != own_address:  # Do not draw self
-                print(f"Drawing peer at {position}")
+                #print(f"Drawing peer at {position}")
+                
                 if(position[0] >= self.last_row - 50 and position[0] <= self.last_row + 50 and position[1] >= self.last_column - 50 and position[1] <= self.last_column + 50):
                     game_won = True
                     game_started = False
@@ -278,15 +310,15 @@ class MyGame(arcade.Window):
                     print(f"{pid} Peer wins!")
                     arcade.draw_text("Peer wins!", 500, 500, arcade.color.WHITE, 16)
                     
-                #arcade.draw_circle_filled(position[0], position[1], SPRITE_SIZE / 3, arcade.color.BLUE)
+                arcade.draw_circle_filled(position[0], position[1], SPRITE_SIZE / 3, arcade.color.BLUE)
                 # Load the image for the sprite
-                peer_sprite = arcade.Sprite()
-                peer_sprite.texture = peer_texture
-                peer_sprite.scale = SPRITE_SCALING - 0.09
-                peer_sprite.set_position(position[0], position[1])
+                # peer_sprite = arcade.Sprite()
+                # peer_sprite.texture = peer_texture
+                # peer_sprite.scale = SPRITE_SCALING - 0.09
+                # peer_sprite.set_position(position[0], position[1])
                 
-                # Draw the peer sprite
-                peer_sprite.draw()
+                # # Draw the peer sprite
+                # peer_sprite.draw()
 
         if game_won:
             
@@ -302,7 +334,7 @@ class MyGame(arcade.Window):
 
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed. """
-
+        global portals
         if key == arcade.key.UP:
             self.player_sprite.change_y = MOVEMENT_SPEED
         elif key == arcade.key.DOWN:
@@ -311,6 +343,24 @@ class MyGame(arcade.Window):
             self.player_sprite.change_x = -MOVEMENT_SPEED
         elif key == arcade.key.RIGHT:
             self.player_sprite.change_x = MOVEMENT_SPEED
+        
+        if key == arcade.key.W:
+            self.player_sprite.change_y = MOVEMENT_SPEED
+        elif key == arcade.key.S:
+            self.player_sprite.change_y = -MOVEMENT_SPEED
+        elif key == arcade.key.A:
+            self.player_sprite.change_x = -MOVEMENT_SPEED
+        elif key == arcade.key.D:
+            self.player_sprite.change_x = MOVEMENT_SPEED
+
+        if key == arcade.key.ESCAPE:
+            os._exit(0)
+        
+        if key == arcade.key.SPACE and self.drop_portal == False:
+            self.drop_portal = True
+            portals[own_address] = ((self.player_sprite.center_x, self.player_sprite.center_y))
+        
+            
 
     def on_key_release(self, key, modifiers):
         """Called when the user releases a key. """
@@ -319,12 +369,19 @@ class MyGame(arcade.Window):
             self.player_sprite.change_y = 0
         elif key == arcade.key.LEFT or key == arcade.key.RIGHT:
             self.player_sprite.change_x = 0
+        elif key == arcade.key.W or key == arcade.key.S:
+            self.player_sprite.change_y = 0
+        elif key == arcade.key.A or key == arcade.key.D:
+            self.player_sprite.change_x = 0
 
     def send_position_update(self):
+        global portals
         while True:
             if self.player_sprite:
+                portals_msg = f"portals {portals}"
                 pos_msg = f"pos_update {own_address[0]}:{own_address[1]} {self.player_sprite.center_x} {self.player_sprite.center_y}"
                 send_message(sock, pos_msg)
+                send_message(sock, portals_msg)
             time.sleep(0.1)  # Update position every 100 ms
                 
     def on_update(self, delta_time):
@@ -418,7 +475,7 @@ def get_host_ip():
     return IP
 
 def receive_messages(sock):
-    global recv_maze, peer_positions, game_started, countdown, maze, game_won
+    global recv_maze, peer_positions, game_started, countdown, maze, game_won, portals
     peer_positions = {}
     while True:
         data, addr = sock.recvfrom(2048)
@@ -452,6 +509,17 @@ def receive_messages(sock):
                 send_maze(sock)  # Send new maze to all
             game_won = True
             game_started = False
+        if message.startswith("portals"):
+            #print(f"Received portals: {message}")
+            _, portal_data = message.split(' ', 1)
+            #print(portal_data)
+            portals_dict = ast.literal_eval(portal_data)
+            for pid, position in portals_dict.items():
+                # print(f"Player ID: {pid}")
+                # print(f"Position: {position}")
+                portals[pid] = position
+                #print(f"Portals: {portals}")
+         
         if addr not in peers:
             peers.append(addr)
             keep_track[addr] = '1'
@@ -464,7 +532,7 @@ def receive_messages(sock):
         last_seen[addr] = time.time()
 
 def send_message(sock, message):
-    if(message.startswith("countdown") or message.startswith("game_won")):
+    if(message.startswith("countdown") or message.startswith("game_won") or message.startswith("portals")):
         sock.sendto(message.encode('utf-8'), own_address)
     for peer in peers:
         if(peer != own_address):
@@ -597,10 +665,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-    
-
-
-
-
