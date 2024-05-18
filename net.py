@@ -6,6 +6,9 @@ import random
 import timeit
 import os
 from maze_generation import create_maze
+from start_window import MyWindow
+from start_window import run_start_window
+
 
 """ Object size and scale """
 INIT_OBJ_SIZE = 165
@@ -30,6 +33,7 @@ MAZE_WIDTH = 21 # Must be an odd number
 """ Global variables """
 game_started = False
 game_won = False
+startBoss = False
 
 countdown = 3
 maze = None
@@ -37,6 +41,7 @@ maze = None
 portal_locations = {}
 teleport_x = 0
 teleport_y = 0
+number_of_peers = 0
 class MazeN(arcade.Window):
     
     def __init__(self, width, height, title, maze, keep_track):
@@ -198,7 +203,7 @@ class MazeN(arcade.Window):
 
         """ Draw the peers with their real-time positions"""
         for pid, position in peer_positions.items():
-            if pid != own_address:  
+            if pid != own_address and keep_track[(pid.split(':')[0], int(pid.split(':')[1]))] != '0':  
                 # Check if the peer has reached the end point
                 if(position[0] >= self.end_x - 50 and position[0] <= self.end_x + 50 and position[1] >= self.end_y - 50 and position[1] <= self.end_y + 50):
                     game_won = True
@@ -229,6 +234,12 @@ class MazeN(arcade.Window):
                 send_maze(sock) # Send the new maze to all peers
             self.start_time = time.time()
             self.setup()
+        number_of_peers = len(peers)
+        output = f"Peer Count: {number_of_peers}"
+        arcade.draw_text(output,
+                         self.view_left + 20,
+                         SCREEN_HEIGHT - 20 + self.view_bottom,
+                         arcade.color.BLUE, 16)
  
 
     def on_key_press(self, key, modifiers):
@@ -252,6 +263,7 @@ class MazeN(arcade.Window):
             self.player_object.change_x = MOVEMENT_SPEED
         elif key == arcade.key.ESCAPE:
             arcade.close_window()
+            os._exit(0)
         elif key == arcade.key.SPACE and self.dropped_portal == False:
             # Drop a portal on own location if one hasn't been dropped
             self.dropped_portal = True
@@ -473,9 +485,9 @@ def heartbeat(sock, own_port):
         check_peers()
 
 def check_peers():
-
+    global peer_positions
     current_time = time.time()
-    timeout = 7 # Timeout after 7 seconds
+    timeout = 5 # Timeout after 7 seconds
     peers_to_remove = []
 
     for peer in peers:
@@ -487,6 +499,9 @@ def check_peers():
             print(f"Peer {peer} has timed out and been removed.")
 
     for peer in peers_to_remove:
+        #remove them from position list
+        if peer in peer_positions:
+            del peer_positions[peer]
         peers.remove(peer)
 
     # Update host after cleaning up timed-out peers
@@ -535,15 +550,15 @@ def update():
         send_status(sock)
 
 def main():
+    run_start_window()  # Run the start window to get the port
     host = get_host_ip()
-    port = int(input("Enter your port number: "))
+    from start_window import entered_port
+    print(f"FFFFFFF {entered_port}")
+    port = entered_port  # Use the entered port from start_window
 
-    #broadcast_address = input("Enter the adress you want to connect to (Type 0 if none): ")
-    #broadcast_port = input("Enter the port you want to connect to (Type 0 if none): ")
+    global peers, last_seen, keep_track, own_address, sock, maze, recv_maze, startBoss
 
-    global peers, last_seen, keep_track, own_address, sock, maze, recv_maze
-
-    own_address = (host,port)
+    own_address = (host, port)
     keep_track = {(host, port): '1'}
     peers = [(host, port)]
     last_seen = {(host, port): time.time()}
@@ -555,26 +570,34 @@ def main():
     sock.bind((host, port))
 
     announce_presence(sock, port)
-    
+
     """ Start the threads """
     threading.Thread(target=receive_messages, args=(sock,)).start()
     threading.Thread(target=update, args=()).start()
     threading.Thread(target=handle_user_input, args=(sock,)).start()
     threading.Thread(target=heartbeat, args=(sock, port)).start()
+    print("HAI")
+
+    pressed_start = False
+    while not pressed_start:  # Wait until the start button is pressed
+        from start_window import pressed_start
+        time.sleep(0.1)
+
+    print()
 
     # If playing from another device (not host) wait 1 sec for the maze to be sent
     time.sleep(1)
 
-    if(keep_track[own_address] == '2'):
+    if keep_track[own_address] == '2':
         maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
-    else:
-        #convert string to list
-        maze = eval(recv_maze) 
+   
 
     """ Start the game """
-    window = MazeN(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, maze, keep_track)
-    window.setup()
-    arcade.run()
+    if pressed_start:
+        print("Starting game...")
+        window = MazeN(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, maze, keep_track)
+        window.setup()
+        arcade.run()
 
 """ Run the main function """
 if __name__ == "__main__":
