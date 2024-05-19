@@ -14,8 +14,8 @@ OBJ_SCALE = 0.28
 OBJ_SIZE = int(INIT_OBJ_SIZE * OBJ_SCALE)
 
 """ Screen size and title """
-SCREEN_WIDTH = 500
-SCREEN_HEIGHT = 400
+SCREEN_WIDTH = 1000
+SCREEN_HEIGHT = 700
 SCREEN_TITLE = "MazeN (Amazing) Game"
 
 # min pixels from player to edge of the screen
