@@ -25,8 +25,8 @@ MOVEMENT_SPEED = 4
 
 """ Maze constants """
 # walls are odd, empty space is even
-MAZE_HEIGHT = 21 # Must be an odd number
-MAZE_WIDTH = 21 # Must be an odd number
+MAZE_HEIGHT = 7 # Must be an odd number
+MAZE_WIDTH = 7 # Must be an odd number
 
 """ Global variables """
 game_started = False
@@ -34,6 +34,7 @@ game_won = False
 startBoss = False
 broadcast_address = None
 broadcast_port = None
+maze_received = False
 
 countdown = 3
 maze = None
@@ -81,12 +82,13 @@ class MazeN(arcade.Window):
 
     """ Set up the game """
     def setup(self):
-        global maze, game_won
+        global maze, game_won, maze_received
        
         self.player_list = arcade.SpriteList()
         self.wall_list = arcade.SpriteList()
 
         """ Set up the walls with images acting as objects """
+        #print(maze)
         for row in range(MAZE_HEIGHT):
             for column in range(MAZE_WIDTH):
                 if maze[row][column] == 1: # If it's a wall
@@ -139,7 +141,7 @@ class MazeN(arcade.Window):
 
                     placed = True
                     break
-
+        maze_received = False
         # Create the physics engine for the player and walls
         self.physics_engine = arcade.PhysicsEngineSimple(self.player_object, self.wall_list)
     
@@ -163,6 +165,8 @@ class MazeN(arcade.Window):
         # This command has to happen before we start drawing
         self.clear()
         
+        if maze_received:
+            self.setup()
         # Draw all the objects.
         self.wall_list.draw()
         self.player_list.draw()
@@ -230,6 +234,10 @@ class MazeN(arcade.Window):
 
         # Check if the game has been won
         if game_won:
+            if keep_track[own_address] == '2':  # If host
+                maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)  # Regenerate maze
+                print(maze)
+                send_maze(sock)  # Send new maze to all
             for pid, portal in portal_locations.items():
                 if portal[0] != -1 and portal[1] != -1:
                     portal_locations[pid] = (-1, -1)
@@ -248,6 +256,7 @@ class MazeN(arcade.Window):
                          self.view_left + 20,
                          SCREEN_HEIGHT - 20 + self.view_bottom,
                          arcade.color.BLUE, 16)
+        
  
     def on_key_press(self, key, modifiers):
         """Called if a key is pressed. """
@@ -329,7 +338,7 @@ class MazeN(arcade.Window):
         if(keep_track[own_address] == '2'): # If host
             if not game_started:   
                 elapsed_time = time.time() - self.start_time    # time elapsed since game started
-                self.countdown = max(0,15 - int(elapsed_time))  # countdown from 5 to 0
+                self.countdown = max(0,3 - int(elapsed_time))  # countdown from 5 to 0
                 send_message(sock, f"countdown {self.countdown}")
                 if self.countdown == 0:
                     self.countdown = 5
@@ -410,7 +419,7 @@ def get_host_ip():
 
 def receive_messages(sock):
     global recv_maze, peer_positions, game_started, countdown, \
-        maze, game_won, portal_locations, teleport_x, teleport_y
+        maze, game_won, portal_locations, teleport_x, teleport_y, maze_received
     
     peer_positions = {}
 
@@ -421,6 +430,8 @@ def receive_messages(sock):
         if message.startswith("maze"):  
             recv_maze = message[5:]
             maze = eval(recv_maze)
+            maze_received = True
+            print(maze)
         elif message.startswith("countdown"):
             _, count = message.split()
             countdown = int(count)
@@ -435,9 +446,6 @@ def receive_messages(sock):
             ip, port = pid.split(':')
             peer_positions[pid] = (float(x), float(y))
         elif message == "game_won": # If a player has won
-            if keep_track[own_address] == '2':  # If host
-                maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)  # Regenerate maze
-                send_maze(sock)  # Send new maze to all
             game_won = True
             game_started = False
         elif message.startswith("portal"):
