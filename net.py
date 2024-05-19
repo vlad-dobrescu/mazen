@@ -167,8 +167,10 @@ class MazeN(arcade.Window):
         self.wall_list.draw()
         self.player_list.draw()
 
+        portals_copy = list(portal_locations.items())
+
         """ Draw the portals """
-        for pid, portal in portal_locations.items(): # pid == peer id, portal == (x, y)
+        for pid, portal in portals_copy: # pid == peer id, portal == (x, y)
             if portal[0] != -1 and portal[1] != -1: # If the portal still exists
                 
                 prt = arcade.Sprite("./assets/50x50_beige.png", OBJ_SCALE)
@@ -247,7 +249,6 @@ class MazeN(arcade.Window):
                          SCREEN_HEIGHT - 20 + self.view_bottom,
                          arcade.color.BLUE, 16)
  
-
     def on_key_press(self, key, modifiers):
         """Called if a key is pressed. """
         global teleport_x, teleport_y
@@ -318,8 +319,7 @@ class MazeN(arcade.Window):
                     send_message(sock, pos_msg)
                     prev_position = current_position
             time.sleep(0.2)
-
-                
+      
     def on_update(self, delta_time):
         """ Movement and game logic """
 
@@ -341,7 +341,6 @@ class MazeN(arcade.Window):
             self.physics_engine.update() # Update the physics engine
             
         self.countdown = countdown # Update the countdown for non-hosts
-
 
         if arcade.check_for_collision_with_list(self.player_object, self.enemy_list): # If player collides with a portal
             for p in self.enemy_list:
@@ -520,7 +519,6 @@ def check_peers():
 
     # Update host after cleaning up timed-out peers
     update_host_peer()
-
 
 def handle_user_input(sock):
     while True:
