@@ -14,8 +14,8 @@ OBJ_SCALE = 0.28
 OBJ_SIZE = int(INIT_OBJ_SIZE * OBJ_SCALE)
 
 """ Screen size and title """
-SCREEN_WIDTH = 1000
-SCREEN_HEIGHT = 700
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
 SCREEN_TITLE = "MazeN (Amazing) Game"
 
 # min pixels from player to edge of the screen
@@ -25,8 +25,8 @@ MOVEMENT_SPEED = 4
 
 """ Maze constants """
 # walls are odd, empty space is even
-MAZE_HEIGHT = 7 # Must be an odd number
-MAZE_WIDTH = 7 # Must be an odd number
+MAZE_HEIGHT = 21 # Must be an odd number
+MAZE_WIDTH = 21 # Must be an odd number
 
 """ Global variables """
 game_started = False
@@ -35,6 +35,7 @@ startBoss = False
 broadcast_address = None
 broadcast_port = None
 maze_received = False
+countdown_received = False
 
 countdown = 3
 maze = None
@@ -88,7 +89,6 @@ class MazeN(arcade.Window):
         self.wall_list = arcade.SpriteList()
 
         """ Set up the walls with images acting as objects """
-        #print(maze)
         for row in range(MAZE_HEIGHT):
             for column in range(MAZE_WIDTH):
                 if maze[row][column] == 1: # If it's a wall
@@ -157,7 +157,7 @@ class MazeN(arcade.Window):
 
     def on_draw(self):
 
-        global game_started, maze, game_won, portal_locations, teleport_x, teleport_y
+        global game_started, maze, game_won, portal_locations, teleport_x, teleport_y, countdown_received
 
         peer_texture = arcade.load_texture("./assets/male_adv.png")
         self.enemy_list = arcade.SpriteList()
@@ -203,12 +203,30 @@ class MazeN(arcade.Window):
             game_won = True
             game_started = False
             send_message(sock, "game_won")
+            self.countdown = 10
+            msg = f"countdown {10}"
+            send_message(sock, msg)
             arcade.draw_text("You win!", 100, 100, arcade.color.BLACK, 30)
             
+        if keep_track[own_address] == '2': # If host
+            if not game_started:
+                msg = f"countdown {self.countdown}"
+                send_message(sock, msg)
+
+        if countdown_received:
+            game_started = False
+            self.countdown = countdown # Update the countdown for non-hosts
+            print(self.countdown)
+            print(game_started)
+            countdown_received = False
+            if self.countdown == 0:
+                game_started = True
+                countdown_received = False
+
         # Draw the countdown
-        if not game_started:
+        if not game_started and self.countdown > 0:
             output = f"Game starting in {self.countdown} seconds"
-            arcade.draw_text(output, 100, 1000, arcade.color.RED, 30)       
+            arcade.draw_text(output, self.start_x - 50, self.start_y +100, arcade.color.RED, 30)       
 
         peer_positions_copy = list(peer_positions.items())  
 
@@ -222,6 +240,10 @@ class MazeN(arcade.Window):
                         game_started = False
                         print(f"{pid} Peer wins!")
                         arcade.draw_text("Peer wins!", 500, 500, arcade.color.WHITE, 16)
+                        msg = f"countdown {10}"
+                        self.countdown = 10
+                        send_message(sock, msg)
+                        break
 
                     #arcade.draw_circle_filled(position[0], position[1], OBJ_SIZE / 3, arcade.color.BLUE)
 
@@ -236,7 +258,6 @@ class MazeN(arcade.Window):
         if game_won:
             if keep_track[own_address] == '2':  # If host
                 maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)  # Regenerate maze
-                print(maze)
                 send_maze(sock)  # Send new maze to all
             for pid, portal in portal_locations.items():
                 if portal[0] != -1 and portal[1] != -1:
@@ -327,7 +348,7 @@ class MazeN(arcade.Window):
                     pos_msg = f"pos_update {own_address[0]}:{own_address[1]} {current_position[0]} {current_position[1]}"
                     send_message(sock, pos_msg)
                     prev_position = current_position
-            time.sleep(0.2)
+            time.sleep(0.1)
       
     def on_update(self, delta_time):
         """ Movement and game logic """
@@ -338,18 +359,18 @@ class MazeN(arcade.Window):
         if(keep_track[own_address] == '2'): # If host
             if not game_started:   
                 elapsed_time = time.time() - self.start_time    # time elapsed since game started
-                self.countdown = max(0,3 - int(elapsed_time))  # countdown from 5 to 0
+                self.countdown = max(0, 15 - int(elapsed_time))  # countdown from 5 to 0
                 send_message(sock, f"countdown {self.countdown}")
+                countdown = self.countdown
                 if self.countdown == 0:
-                    self.countdown = 5
+                    send_message(sock, "game_started")
                     game_started = True
 
         if game_started:
             # Send message to all peers that game has started
-            send_message(sock, "game_started")
             self.physics_engine.update() # Update the physics engine
             
-        self.countdown = countdown # Update the countdown for non-hosts
+        
 
         if arcade.check_for_collision_with_list(self.player_object, self.enemy_list): # If player collides with a portal
             for p in self.enemy_list:
@@ -419,7 +440,7 @@ def get_host_ip():
 
 def receive_messages(sock):
     global recv_maze, peer_positions, game_started, countdown, \
-        maze, game_won, portal_locations, teleport_x, teleport_y, maze_received
+        maze, game_won, portal_locations, teleport_x, teleport_y, maze_received, countdown_received
     
     peer_positions = {}
 
@@ -431,12 +452,22 @@ def receive_messages(sock):
             recv_maze = message[5:]
             maze = eval(recv_maze)
             maze_received = True
-            print(maze)
+        elif message.startswith("hello from"):
+            msg = f"maze {maze}"
+            sock.sendto(msg.encode('utf-8'), addr)
+            if game_started:
+                sock.sendto("game_started".encode('utf-8'), addr)
+            else:
+                msg = f"countdown {countdown}"
+                sock.sendto(msg.encode('utf-8'), addr)    
         elif message.startswith("countdown"):
             _, count = message.split()
             countdown = int(count)
+            countdown_received = True
+            #print(countdown)
         elif message.startswith("game_started"):
             game_started = True
+            #print("Game started")
         elif message.startswith("status"):
             _, ip, port, status = message.split()
             peer = (ip, int(port))
@@ -452,6 +483,11 @@ def receive_messages(sock):
             _, ip, port, x, y = message.split()
             peer = (ip, int(port))
             portal_locations[peer] = (float(x), float(y))
+        elif message.startswith("heartbeat"):
+            _, port = message.split()
+            for peer in peers:
+                if peer[1] == int(port):
+                    last_seen[peer] = time.time()
         elif message.startswith("teleport"):
             _, x, y = message.split()
             teleport_x = float(x)
@@ -462,6 +498,8 @@ def receive_messages(sock):
             keep_track[addr] = '1'
             print(f"New peer added: {addr}")
             send_maze(sock)
+            if keep_track[own_address] == '2':
+                send_message(sock, "game_started")
         if(len(peers) == 1): # If there's only one peer
             keep_track[addr] = '2' # Make the peer the host
 
@@ -500,8 +538,8 @@ def announce_presence(sock, own_port):
 def heartbeat(sock, own_port):
     """ Send a heartbeat message to all peers every 5 seconds to check if they're still alive"""
     while True:
-        time.sleep(5)
-        send_message(sock, f"heartbeat from {own_port}")
+        time.sleep(3)
+        send_message(sock, f"heartbeat {own_port}")
         check_peers()
 
 def check_peers():
@@ -577,6 +615,7 @@ def main():
     #broadcast_port = input("Enter the port you want to connect to (Type 0 if none): ")
 
     global peers, last_seen, keep_track, own_address, sock, maze, recv_maze, broadcast_address, broadcast_port
+    recv_maze = None
 
     broadcast_address = input("Enter the address you want to connect to (0 for none/ 1 for localhost): ")
     broadcast_port = int(input("Enter the port you want to connect to(0 for none): "))
@@ -602,6 +641,13 @@ def main():
 
     # If playing from another device (not host) wait 1 sec for the maze to be sent
     time.sleep(1)
+
+    if(keep_track[own_address] != '2'):
+        while(recv_maze == None):
+            print("That person is not connected yet. Please wait for them to connect or press CTRL+C to exit.")
+            time.sleep(1)
+            announce_presence(sock, port)
+        
 
     if(keep_track[own_address] == '2'):
         maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
