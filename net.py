@@ -6,6 +6,8 @@ import random
 import timeit
 import os
 from maze_generation import create_maze
+from start import MyWindow
+from start import run_start_window
 
 
 """ Object size and scale """
@@ -271,10 +273,7 @@ class MazeN(arcade.Window):
             self.setup()
         number_of_peers = len(peers)
         output = f"Peer Count: {number_of_peers}"
-        arcade.draw_text(output,
-                         self.view_left + 20,
-                         SCREEN_HEIGHT - 20 + self.view_bottom,
-                         arcade.color.BLUE, 16)
+        arcade.draw_text(output, self.view_left + 20, SCREEN_HEIGHT - 20 + self.view_bottom,arcade.color.BLUE, 16)
         
  
     def on_key_press(self, key, modifiers):
@@ -526,8 +525,8 @@ def send_status(sock):
 def announce_presence(sock, own_port):
     global broadcast_address, broadcast_port
     message = f"hello from {own_port}"
-    if broadcast_address == '1' or broadcast_address == 'localhost':
-        broadcast_address = '192.168.0.101'  # Ensure this is the correct broadcast address for your network
+    if broadcast_address == '1' or broadcast_address == get_host_ip():
+        broadcast_address = get_host_ip()  # Ensure this is the correct broadcast address for your network
     if broadcast_address != '0' and broadcast_port != 0:
         sock.sendto(message.encode('utf-8'), (broadcast_address, broadcast_port))
     else:
@@ -606,14 +605,17 @@ def update():
         send_status(sock)
 
 def main():
+    run_start_window()
     host = get_host_ip()
-    port = int(input("Enter your port number: "))
-
+    #port = int(input("Enter your port number: "))
+    from start import entered_port
+    port = entered_port
+    print(host)
     global peers, last_seen, keep_track, own_address, sock, maze, recv_maze, broadcast_address, broadcast_port
     recv_maze = None
 
-    broadcast_address = input("Enter the address you want to connect to (0 for none/ 1 for localhost): ")
-    broadcast_port = int(input("Enter the port you want to connect to(0 for none): "))
+    #broadcast_address = input("Enter the address you want to connect to (0 for none/ 1 for localhost): ")
+    #broadcast_port = int(input("Enter the port you want to connect to(0 for none): "))
 
     own_address = (host,port)
     keep_track = {(host, port): '1'}
@@ -626,6 +628,23 @@ def main():
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sock.bind((host, port))
 
+    pressed_start = False
+    while not pressed_start:  # Wait until the start button is pressed
+        from start import pressed_start
+        time.sleep(0.1)
+
+    if pressed_start:
+        from start import new_game, existing_game
+        if new_game:
+            broadcast_address = '0'
+            broadcast_port = 0
+            print("New game started.")
+        elif existing_game:
+            from start import entered_address, connect_port
+            broadcast_address = entered_address
+            broadcast_port = connect_port
+            print(f" to {broadcast_address}:{broadcast_port}")
+
     announce_presence(sock, port)
     
     """ Start the threads """
@@ -633,6 +652,7 @@ def main():
     threading.Thread(target=update, args=()).start()
     threading.Thread(target=handle_user_input, args=(sock,)).start()
     threading.Thread(target=heartbeat, args=(sock, port)).start()
+
 
     # If playing from another device (not host) wait 1 sec for the maze to be sent
     time.sleep(1)
@@ -650,10 +670,12 @@ def main():
         #convert string to list
         maze = eval(recv_maze) 
 
+
     """ Start the game """
-    window = MazeN(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, maze, keep_track)
-    window.setup()
-    arcade.run()
+    if pressed_start:
+        window = MazeN(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, maze, keep_track)
+        window.setup()
+        arcade.run()
 
 """ Run the main function """
 if __name__ == "__main__":

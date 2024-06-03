@@ -17,7 +17,7 @@ def create_grid(width, height):
                 grid[row].append(FULL)
     return grid
 
-
+#DFS maze
 def create_maze(maze_width, maze_height):
     # Initialize the maze grid
     maze = create_grid(maze_width, maze_height)
