@@ -1,3 +1,5 @@
+""" Character pack by Kenney Vleugels (www.kenney.nl) """
+
 import arcade
 import arcade.gui
 import os
