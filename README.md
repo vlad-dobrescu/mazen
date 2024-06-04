@@ -1,8 +1,15 @@
 # MazeN 
-MazeN is a multiplayer game created by [Vlad Dobrescu](https://github.com/vlad-dobrescu) and [Alesia Vlasiu](https://github.com/alesia-vlasiu). The game uses a Peer-to-Peer network with host migration and lock-step simulation.
+MazeN (Amazing) is a multiplayer game created by [Vlad Dobrescu](https://github.com/vlad-dobrescu) and [Alesia Vlasiu](https://github.com/alesia-vlasiu). The game is written entirely in python
 
 ## Game Description
 You can either start a new game (becoming the host) or connect to an existing game by entering a connected player's address and port. After entering a game, you spawn in the top left corner cell of a randomly generated maze. The goal of the game is to reach the bottom right corner cell of the maze. After a connected player reaches the end, the game restarts with a new maze.
+
+## Networking features
+ * **Peer-to-Peer network** 
+ * **Host migration**
+ * **Lock-step simulation**
+ * **UDP**
+   
 
 ## Game Features
 * **Movement:** "W, A, S, D" or arrows for movement
@@ -16,6 +23,9 @@ You can either start a new game (becoming the host) or connect to an existing ga
 
 * **Hide opponents:** Press "I" to hide opponents for a better game fluidity, if needed
 
+## Game UI
+  <img src="./assets/countdown.gif" width="500" align="center">
+  
 ## Setup
 
 1. Ensure that you have python arcade installed 
