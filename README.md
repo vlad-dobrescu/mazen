@@ -1,40 +1,57 @@
-# MazeN 
-MazeN (Amazing) is a multiplayer game created by [Vlad Dobrescu](https://github.com/vlad-dobrescu) and [Alesia Vlasiu](https://github.com/alesia-vlasiu). The game is written entirely in python
+# MazeN
+MazeN ("Amazing") is a multiplayer maze game by [Vlad Dobrescu](https://github.com/vlad-dobrescu) and [Alesia Vlasiu](https://github.com/alesia-vlasiu), written entirely in Python.
+
+---
 
 ## Game Description
-You can either start a new game (becoming the host) or connect to an existing game by entering a connected player's address and port. After entering a game, you spawn in the top left corner cell of a randomly generated maze. The goal of the game is to reach the bottom right corner cell of the maze. After a connected player reaches the end, the game restarts with a new maze.
+Players can start a new game (as host) or join an existing one by entering a connected player's address and port. Players spawn in the top-left corner of a randomly generated maze, aiming to reach the bottom-right corner. When a player wins, the game restarts with a new maze.
 
-## Networking features
- * **Peer-to-Peer network** 
- * **Host migration**
- * **Lock-step simulation**
- * **UDP**
-   
+---
+
+## Networking Features
+- **Peer-to-Peer network**  
+- **Host migration**  
+- **Lock-step simulation**  
+- **UDP Protocol**  
+
+---
 
 ## Game Features
-* **Movement:** "W, A, S, D" or arrows for movement
-* **Countdown:** At the start of every game, there is a visible countdown to allow time for players to connect before the game starts. Movement is restricted while the countdown is active.
-* **Portals:** Any player has the ability to place one portal per match by pressing the spacebar. The portal is a hardly visible square.
-   * **Portal Collision:** If an opponent collides with your portal, they will be teleported back to the starting cell.
-   * **Destroy Portals:** If you spot somebody's portal and you are situated in the same cell as the portal, you unlock the ability to destroy it by pressing 'X' on your keyboard. This action will not only destroy the portal but also teleport the player who placed it to the destroyed portal's coordinates.
-* **Maze:** The maze generation is done using the Randomized Depth First Search Algorithm
-  
-* **Peer count:** The number of connected peers is displayed in the top left corner of the screen at all times
+- **Movement:** Use "W, A, S, D" or arrow keys.  
+- **Countdown Timer:** A countdown at the start lets players join before the game begins, with restricted movement during this time.  
+- **Portals:**  
+  - Press spacebar to place one portal per match (a subtle square).  
+  - **Portal Collision:** Opponents colliding with your portal are teleported back to the start.  
+  - **Destroy Portals:** Stand on a portal and press "X" to destroy it, teleporting its creator to the portal's location.  
+- **Maze Generation:** Randomized Depth-First Search algorithm ensures unique mazes.  
+- **Peer Count:** Displays the number of connected peers in the top-left corner.  
+- **Hide Opponents:** Press "I" to hide opponents for smoother gameplay.
 
-* **Hide opponents:** Press "I" to hide opponents for a better game fluidity, if needed
+---
 
-## Game UI
-  <img src="./assets/countdown.gif" width="500" align="center">
-  
+## Game Preview
+### Portal Feature
+<video width="100%" controls muted>
+  <source src="./videos/generalgame.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+### Maze Reset After Win
+<video width="100%" controls muted>
+  <source src="./videos/endgame.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+---
+
 ## Setup
 
-1. Ensure that you have python arcade installed 
-```bash
-pip install arcade
-```
-2. Clone this repository on your machine
-3. Run the following file:
-```bash
-python net.py
-```
-  
+1. Install Python Arcade:
+   ```bash
+   pip install arcade
+   ```
+2. Clone this repository.
+3. Run the game:
+   ```bash
+   python net.py
+   ```
