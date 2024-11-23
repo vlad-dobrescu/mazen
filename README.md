@@ -31,16 +31,12 @@ Players can start a new game (as host) or join an existing one by entering a con
 
 ## Game Preview
 ### Portal Feature
-<video width="100%" controls muted>
-  <source src="./videos/generalgame.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+[![Watch the video](https://img.youtube.com/vi/Y4PRZb1RI3s/0.jpg)](https://www.youtube.com/watch?v=Y4PRZb1RI3s)
+
+
 
 ### Maze Reset After Win
-<video width="100%" controls muted>
-  <source src="./videos/endgame.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+[![Watch the video](https://img.youtube.com/vi/ZVSG6uoRkfw/0.jpg)](https://youtu.be/ZVSG6uoRkfw)
 
 ---
 
