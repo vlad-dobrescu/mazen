@@ -1,5 +1,5 @@
 # MazeN
-MazeN ("Amazing") is a multiplayer maze game by [Vlad Dobrescu](https://github.com/vlad-dobrescu) and [Alesia Vlasiu](https://github.com/alesia-vlasiu), written entirely in Python.
+MazeN ("Amazing") is a multiplayer maze game by [Vlad Dobrescu](https://github.com/vlad-dobrescu) and [Alesia Vlasiu](https://github.com/alesiavlasiu), written entirely in Python.
 
 ---
 
